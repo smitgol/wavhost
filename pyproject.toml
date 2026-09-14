@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wavhost"
+version = "0.1.0"
+description = "Local-first TTS runtime with OpenAI-compatible API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    {name = "Wavhost Contributors"}
+]
+keywords = [
+    "tts",
+    "text-to-speech",
+    "speech",
+    "local",
+    "runtime",
+    "openai",
+    "chatterbox",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "httpx>=0.26.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.66.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+]
+
+[project.optional-dependencies]
+# Backend engines are installed on demand by `wavhost pull`. These extras exist
+# so the same packages can also be installed ahead of time, e.g. for offline or
+# air-gapped machines.
+chatterbox = [
+    "chatterbox-tts>=0.1.0",
+    # resemble-perth imports pkg_resources, removed in setuptools 82.0.0.
+    "setuptools<82",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+]
+publish = [
+    "build>=1.2.0",
+    "twine>=6.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/smitgol/wavhost"
+Documentation = "https://github.com/smitgol/wavhost#readme"
+Repository = "https://github.com/smitgol/wavhost"
+Issues = "https://github.com/smitgol/wavhost/issues"
+Changelog = "https://github.com/smitgol/wavhost/blob/master/CHANGELOG.md"
+
+[project.scripts]
+wavhost = "wavhost.cli:main"
+
+[tool.setuptools]
+packages = ["wavhost"]
+include-package-data = false
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
