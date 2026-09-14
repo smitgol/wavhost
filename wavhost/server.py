@@ -152,8 +152,11 @@ class AudioConverter:
             Raw S16LE bytes (interleaved by channel if multi-channel)
         """
         audio = audio_tensor.detach().float().cpu().clamp(-1.0, 1.0)
-        pcm = (audio * 32767.0).to(torch.int16)
-        return pcm.numpy().tobytes()
+        pcm = (audio * 32767.0).to(torch.int16).contiguous()
+        # Avoid Tensor.numpy(): torch can be installed without NumPy.
+        offset = pcm.storage_offset() * pcm.element_size()
+        nbytes = pcm.numel() * pcm.element_size()
+        return bytes(pcm.untyped_storage())[offset : offset + nbytes]
 
     @classmethod
     def resample(
