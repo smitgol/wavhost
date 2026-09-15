@@ -112,6 +112,19 @@ TURBO_FILES = (
     "special_tokens_map.json",
 )
 
+NANO_REPO = "ResembleAI/chatterbox-nano"
+NANO_FILES = (
+    "ve.safetensors",
+    "t3_nano_v1.safetensors",
+    "s3gen_meanflow.safetensors",
+    "conds.pt",
+    "tokenizer_config.json",
+    "vocab.json",
+    "merges.txt",
+    "added_tokens.json",
+    "special_tokens_map.json",
+)
+
 BASE_REPO = "ResembleAI/chatterbox"
 BASE_FILES = (
     "ve.safetensors",
@@ -165,6 +178,21 @@ BUILT_IN_MODELS = {
         layers=_layers(TURBO_REPO, TURBO_FILES),
         recommended_device="cuda",
         vram_requirement="~2GB",
+    ),
+    "chatterbox-nano": ModelInfo(
+        namespace=CHATTERBOX_NAMESPACE,
+        name="chatterbox-nano",
+        tag="latest",
+        backend="chatterbox",
+        description="Chatterbox Nano - 110M parameter English TTS, CPU-optimized (MIT License)",
+        license=CHATTERBOX_LICENSE,
+        license_url=CHATTERBOX_LICENSE_URL,
+        huggingface_repo=NANO_REPO,
+        model_class="ChatterboxTurboTTS",
+        model_kwargs={"nano": True},
+        layers=_layers(NANO_REPO, NANO_FILES),
+        recommended_device="cpu",
+        vram_requirement="~1GB",
     ),
     "chatterbox-base": ModelInfo(
         namespace=CHATTERBOX_NAMESPACE,

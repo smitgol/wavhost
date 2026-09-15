@@ -147,11 +147,12 @@ wavhost voice rm my-narrator
 | Model | Size | Device | Description |
 |-------|------|--------|-------------|
 | `chatterbox-turbo` | 350M | GPU | Fast, high-quality English TTS (MIT) |
+| `chatterbox-nano` | 110M | CPU/GPU | Lightweight, CPU-optimized English TTS (MIT) |
 | `chatterbox-base` | 500M | GPU | Original high-quality model (MIT) |
 | `qwen-0.6b` | 600M | GPU | Multilingual voice cloning (Apache-2.0) |
 | `qwen-1.7b` | 1.7B | GPU | Multilingual voice cloning, higher quality (Apache-2.0) |
 
-**Chatterbox models** (MIT License by Resemble AI) focus on high-quality English synthesis with built-in voices.
+**Chatterbox models** (MIT License by Resemble AI) focus on high-quality English synthesis with built-in voices. Nano is optimized for CPU inference (3× realtime on 8 cores) and edge deployment.
 
 **Qwen3-TTS models** (Apache-2.0 by Alibaba) support 10 languages (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian) and require a reference voice for cloning. Use with `--voice` to specify a saved voice or reference audio file.
 
