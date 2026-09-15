@@ -15,6 +15,7 @@ from wavhost.registry import ModelInfo
 logger = get_logger(__name__)
 
 BACKEND_NAME = "chatterbox"
+QWEN_BACKEND_NAME = "qwen"
 
 
 class TTSBackend(Protocol):
@@ -292,6 +293,237 @@ class ChatterboxBackend:
         return self._sr
 
 
+class QwenBackend:
+    """Qwen3-TTS backend implementation.
+    
+    Loads weights from a local checkpoint directory produced by `wavhost pull`
+    (never calls the Hugging Face Hub client at runtime).
+    """
+    
+    def __init__(
+        self,
+        model_class: str,
+        checkpoint_path: Union[str, Path],
+        model_kwargs: Optional[dict] = None,
+        device: Optional[str] = None
+    ):
+        """Initialize Qwen backend.
+        
+        Args:
+            model_class: Name of the model class ('Qwen3TTSModel')
+            checkpoint_path: Local directory with model files (from pull)
+            model_kwargs: Optional model initialization kwargs
+            device: Device to run on ('cuda', 'cpu', or 'mps'). Auto-detects if None.
+            
+        Raises:
+            BackendError: If model class is invalid or checkpoint is missing
+        """
+        self._validate_model_class(model_class)
+        
+        self._model_class = model_class
+        self._model_kwargs = model_kwargs or {}
+        self._checkpoint_path = Path(checkpoint_path)
+        self._device = device or self._detect_device()
+        self._model = None
+        self._sr = DEFAULT_SAMPLE_RATE
+        
+        if not self._checkpoint_path.is_dir():
+            raise BackendError(
+                f"Checkpoint directory not found: {self._checkpoint_path}. "
+                f"Pull the model first with: wavhost pull <model>"
+            )
+        
+        logger.info(
+            f"Initialized {model_class} backend on {self._device} "
+            f"from {self._checkpoint_path}"
+        )
+    
+    @staticmethod
+    def _validate_model_class(model_class: str) -> None:
+        """Validate that the model class is supported.
+        
+        Args:
+            model_class: Model class name
+            
+        Raises:
+            BackendError: If model class is invalid
+        """
+        valid_classes = {"Qwen3TTSModel"}
+        if model_class not in valid_classes:
+            raise BackendError(
+                f"Invalid model class '{model_class}'. "
+                f"Must be one of: {', '.join(valid_classes)}"
+            )
+    
+    @staticmethod
+    def _detect_device() -> str:
+        """Detect the best available device.
+        
+        Returns:
+            Device string ('cuda', 'mps', or 'cpu')
+        """
+        if torch.cuda.is_available():
+            return DEFAULT_DEVICE
+        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return "mps"
+        return CPU_DEVICE
+    
+    def _load_model(self) -> None:
+        """Lazy load the model on first use from the local checkpoint.
+        
+        Raises:
+            BackendError: If model loading fails
+        """
+        if self._model is not None:
+            return
+        
+        if not dependencies.is_installed(QWEN_BACKEND_NAME):
+            raise BackendError(dependencies.missing_engine_message(QWEN_BACKEND_NAME))
+        
+        logger.info(
+            f"Loading {self._model_class} from {self._checkpoint_path}..."
+        )
+        
+        try:
+            from qwen_tts import Qwen3TTSModel
+            
+            device_map = "cuda:0" if self._device == "cuda" else self._device
+            dtype = torch.bfloat16 if self._device in ["cuda", "mps"] else torch.float32
+            
+            self._model = Qwen3TTSModel.from_pretrained(
+                str(self._checkpoint_path),
+                device_map=device_map,
+                dtype=dtype,
+            )
+            
+            self._sr = 24000
+            logger.info(f"Model loaded successfully (sample rate: {self._sr} Hz)")
+            
+        except ImportError as e:
+            raise BackendError(
+                f"Failed to import Qwen3-TTS. "
+                f"Install with: {dependencies.install_hint(QWEN_BACKEND_NAME)}\n"
+                f"Error: {e}"
+            ) from e
+        except Exception as e:
+            logger.debug("Qwen3-TTS model load failed", exc_info=True)
+            raise BackendError(
+                f"Failed to load Qwen3-TTS model: {type(e).__name__}: {e}"
+            ) from e
+    
+    def generate(
+        self,
+        text: str,
+        voice: Optional[str] = None,
+        voice_handle: Optional[Any] = None,
+        **kwargs
+    ) -> tuple[torch.Tensor, int]:
+        """Generate speech from text using Qwen3-TTS.
+        
+        Args:
+            text: Text to synthesize
+            voice: Optional path to reference voice audio (for ad-hoc cloning)
+            voice_handle: Optional voice handle (dict with 'ref_audio_path' key for Qwen)
+            **kwargs: Additional parameters (language, x_vector_only_mode, etc.)
+            
+        Returns:
+            Tuple of (audio_tensor, sample_rate)
+            
+        Raises:
+            BackendError: If generation fails
+        """
+        self._load_model()
+        
+        generate_kwargs = kwargs.copy()
+        
+        ref_audio_path = None
+        if voice_handle:
+            if isinstance(voice_handle, dict) and "ref_audio_path" in voice_handle:
+                ref_audio_path = voice_handle["ref_audio_path"]
+                audio_path = Path(ref_audio_path)
+                if not audio_path.exists():
+                    raise BackendError(f"Voice reference audio not found: {audio_path}")
+                logger.debug(f"Using saved voice from {audio_path}")
+            else:
+                raise BackendError(
+                    f"Invalid voice handle for Qwen backend: {voice_handle}"
+                )
+        elif voice:
+            voice_path = Path(voice)
+            if not voice_path.exists():
+                raise BackendError(f"Reference voice audio not found: {voice}")
+            ref_audio_path = str(voice_path)
+            logger.debug(f"Cloning voice from {voice_path}")
+        
+        try:
+            logger.debug(f"Generating speech for text (length: {len(text)})")
+            
+            if ref_audio_path:
+                language = generate_kwargs.pop("language", "English")
+                ref_text = generate_kwargs.pop("ref_text", None)
+                x_vector_only_mode = generate_kwargs.pop("x_vector_only_mode", True)
+                
+                wavs, sr = self._model.generate_voice_clone(
+                    text=text,
+                    language=language,
+                    ref_audio=ref_audio_path,
+                    ref_text=ref_text,
+                    x_vector_only_mode=x_vector_only_mode,
+                    **generate_kwargs
+                )
+            else:
+                raise BackendError(
+                    "Qwen3-TTS requires a reference voice for generation. "
+                    "Use the --voice parameter or create a saved voice."
+                )
+            
+            import numpy as np
+            wav_np = wavs[0] if isinstance(wavs, list) else wavs
+            wav_tensor = torch.from_numpy(wav_np).float()
+            
+            return wav_tensor, sr
+            
+        except Exception as e:
+            raise BackendError(f"Speech generation failed: {e}")
+    
+    def create_voice(
+        self,
+        ref_audio_path: str,
+        **kwargs
+    ) -> dict[str, str]:
+        """Create a voice handle from reference audio.
+        
+        For Qwen3-TTS, we store the reference audio path since the model
+        clones voices on-the-fly during generation.
+        
+        Args:
+            ref_audio_path: Path to reference audio file
+            **kwargs: Unused (for API compatibility)
+            
+        Returns:
+            Dict with 'ref_audio_path' key
+            
+        Raises:
+            BackendError: If audio file doesn't exist
+        """
+        audio_path = Path(ref_audio_path)
+        if not audio_path.exists():
+            raise BackendError(f"Reference audio not found: {ref_audio_path}")
+        
+        return {
+            "ref_audio_path": str(audio_path),
+        }
+    
+    @property
+    def sample_rate(self) -> int:
+        """Get the sample rate of generated audio.
+        
+        Returns:
+            Sample rate in Hz
+        """
+        return self._sr
+
+
 def create_backend(
     model_info: ModelInfo,
     device: Optional[str] = None,
@@ -312,24 +544,31 @@ def create_backend(
     """
     backend_type = model_info.backend
     
+    if checkpoint_path is None:
+        raise BackendError(
+            "checkpoint_path is required. "
+            "Pull the model first with: wavhost pull <model>"
+        )
+    
+    actual_device = device or model_info.recommended_device
+    
+    if actual_device == DEFAULT_DEVICE and not torch.cuda.is_available():
+        message = "GPU not available, falling back to CPU"
+        gpu_hint = dependencies.gpu_build_warning()
+        if gpu_hint:
+            message = f"{message}\n{gpu_hint}"
+        logger.warning(message)
+        actual_device = CPU_DEVICE
+    
     if backend_type == BACKEND_NAME:
-        if checkpoint_path is None:
-            raise BackendError(
-                "checkpoint_path is required. "
-                "Pull the model first with: wavhost pull <model>"
-            )
-        
-        actual_device = device or model_info.recommended_device
-        
-        if actual_device == DEFAULT_DEVICE and not torch.cuda.is_available():
-            message = "GPU not available, falling back to CPU"
-            gpu_hint = dependencies.gpu_build_warning()
-            if gpu_hint:
-                message = f"{message}\n{gpu_hint}"
-            logger.warning(message)
-            actual_device = CPU_DEVICE
-        
         return ChatterboxBackend(
+            model_class=model_info.model_class,
+            checkpoint_path=checkpoint_path,
+            model_kwargs=model_info.model_kwargs,
+            device=actual_device
+        )
+    elif backend_type == QWEN_BACKEND_NAME:
+        return QwenBackend(
             model_class=model_info.model_class,
             checkpoint_path=checkpoint_path,
             model_kwargs=model_info.model_kwargs,

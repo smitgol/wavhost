@@ -60,6 +60,9 @@ chatterbox = [
     # resemble-perth imports pkg_resources, removed in setuptools 82.0.0.
     "setuptools<82",
 ]
+qwen = [
+    "qwen-tts>=0.1.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",

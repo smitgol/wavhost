@@ -60,6 +60,12 @@ BACKEND_REQUIREMENTS: dict[str, BackendRequirement] = {
         # pull time instead of at first synthesis.
         import_probes=("chatterbox", "pkg_resources"),
     ),
+    "qwen": BackendRequirement(
+        extra="qwen",
+        import_name="qwen_tts",
+        packages=("qwen-tts>=0.1.0",),
+        import_probes=("qwen_tts", "transformers"),
+    ),
 }
 
 

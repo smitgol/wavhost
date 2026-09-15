@@ -148,8 +148,12 @@ wavhost voice rm my-narrator
 |-------|------|--------|-------------|
 | `chatterbox-turbo` | 350M | GPU | Fast, high-quality English TTS (MIT) |
 | `chatterbox-base` | 500M | GPU | Original high-quality model (MIT) |
+| `qwen-0.6b` | 600M | GPU | Multilingual voice cloning (Apache-2.0) |
+| `qwen-1.7b` | 1.7B | GPU | Multilingual voice cloning, higher quality (Apache-2.0) |
 
-All models are licensed under MIT and developed by Resemble AI.
+**Chatterbox models** (MIT License by Resemble AI) focus on high-quality English synthesis with built-in voices.
+
+**Qwen3-TTS models** (Apache-2.0 by Alibaba) support 10 languages (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian) and require a reference voice for cloning. Use with `--voice` to specify a saved voice or reference audio file.
 
 ## CLI Reference
 

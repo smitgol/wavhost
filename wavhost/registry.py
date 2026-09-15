@@ -79,6 +79,10 @@ CHATTERBOX_LICENSE_URL = "https://github.com/resemble-ai/chatterbox/blob/main/LI
 CHATTERBOX_NAMESPACE = "resemble"
 CHATTERBOX_LICENSE = "MIT"
 
+QWEN_LICENSE_URL = "https://github.com/QwenLM/Qwen3-TTS/blob/main/LICENSE"
+QWEN_NAMESPACE = "qwen"
+QWEN_LICENSE = "Apache-2.0"
+
 
 def _hf_resolve(repo: str, filename: str) -> str:
     """Build a plain HTTPS resolve URL for a Hugging Face file.
@@ -117,6 +121,36 @@ BASE_FILES = (
     "conds.pt",
 )
 
+QWEN_0_6B_REPO = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+QWEN_0_6B_FILES = (
+    "config.json",
+    "generation_config.json",
+    "merges.txt",
+    "model.safetensors",
+    "preprocessor_config.json",
+    "tokenizer_config.json",
+    "vocab.json",
+    "speech_tokenizer/config.json",
+    "speech_tokenizer/configuration.json",
+    "speech_tokenizer/model.safetensors",
+    "speech_tokenizer/preprocessor_config.json",
+)
+
+QWEN_1_7B_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+QWEN_1_7B_FILES = (
+    "config.json",
+    "generation_config.json",
+    "merges.txt",
+    "model.safetensors",
+    "preprocessor_config.json",
+    "tokenizer_config.json",
+    "vocab.json",
+    "speech_tokenizer/config.json",
+    "speech_tokenizer/configuration.json",
+    "speech_tokenizer/model.safetensors",
+    "speech_tokenizer/preprocessor_config.json",
+)
+
 BUILT_IN_MODELS = {
     "chatterbox-turbo": ModelInfo(
         namespace=CHATTERBOX_NAMESPACE,
@@ -145,6 +179,38 @@ BUILT_IN_MODELS = {
         layers=_layers(BASE_REPO, BASE_FILES),
         recommended_device="cuda",
         vram_requirement="~3GB",
+    ),
+    "qwen-0.6b": ModelInfo(
+        namespace=QWEN_NAMESPACE,
+        name="qwen-0.6b",
+        tag="latest",
+        backend="qwen",
+        description="Qwen3-TTS 0.6B - Multilingual voice cloning model (Apache-2.0 License)",
+        license=QWEN_LICENSE,
+        license_url=QWEN_LICENSE_URL,
+        huggingface_repo=QWEN_0_6B_REPO,
+        model_class="Qwen3TTSModel",
+        layers=_layers(QWEN_0_6B_REPO, QWEN_0_6B_FILES),
+        recommended_device="cuda",
+        vram_requirement="~3GB",
+        languages=["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
+        sample_rate=24000,
+    ),
+    "qwen-1.7b": ModelInfo(
+        namespace=QWEN_NAMESPACE,
+        name="qwen-1.7b",
+        tag="latest",
+        backend="qwen",
+        description="Qwen3-TTS 1.7B - Multilingual voice cloning model (Apache-2.0 License)",
+        license=QWEN_LICENSE,
+        license_url=QWEN_LICENSE_URL,
+        huggingface_repo=QWEN_1_7B_REPO,
+        model_class="Qwen3TTSModel",
+        layers=_layers(QWEN_1_7B_REPO, QWEN_1_7B_FILES),
+        recommended_device="cuda",
+        vram_requirement="~5GB",
+        languages=["en", "zh", "ja", "ko", "de", "fr", "ru", "pt", "es", "it"],
+        sample_rate=24000,
     ),
 }
 
