@@ -14,6 +14,7 @@ Wavhost is a local text-to-speech (TTS) runtime that brings high-quality voice s
 - 🔌 **OpenAI-compatible API**: Drop-in replacement for OpenAI's `/v1/audio/speech` endpoint
 - 📦 **Ollama-style storage**: Content-addressed model storage with deduplication
 - 🎯 **Simple CLI**: Pull, run, and serve models with ease
+- 🎤 **Voice library**: Create, save, and manage custom voices locally
 - 🔓 **Open source**: MIT/Apache-2.0 licensed runtime, using open TTS models
 - ⚡ **GPU accelerated**: Optimized for NVIDIA GPUs (CPU fallback available)
 
@@ -58,6 +59,21 @@ wavhost pull chatterbox-turbo --skip-deps
 wavhost run chatterbox-turbo "Hello world, this is Wavhost!" -o output.wav
 ```
 
+### Manage Voices
+
+Create and save custom voices from reference audio:
+
+```bash
+# Create a voice from reference audio
+wavhost voice create my-voice --ref reference.wav --desc "My custom voice"
+
+# List saved voices
+wavhost voice list
+
+# Use a saved voice
+wavhost run chatterbox-turbo "Hello from my voice!" --voice my-voice -o output.wav
+```
+
 ### Start the Server
 
 ```bash
@@ -74,10 +90,12 @@ curl http://127.0.0.1:11435/v1/audio/speech \
   -d '{
     "model": "chatterbox-turbo",
     "input": "Hello from Wavhost!",
-    "voice": "default"
+    "voice": "my-voice"
   }' \
   --output speech.mp3
 ```
+
+Use `"voice": "default"` for the built-in voice, or specify a saved voice name.
 
 ## Available Models
 
@@ -109,12 +127,65 @@ Generate speech from text using a local model.
 
 **Options:**
 - `-o, --output PATH`: Output WAV file path (default: `output.wav`)
-- `--voice PATH`: Reference voice audio for cloning (experimental)
+- `--voice NAME_OR_PATH`: Saved voice name from local library, or path to reference audio
 - `--device DEVICE`: Device to use (`cuda`, `cpu`, or `mps`)
 
 **Example:**
 ```bash
 wavhost run chatterbox-turbo "Welcome to Wavhost" -o welcome.wav
+
+# Use a saved voice
+wavhost run chatterbox-turbo "Hello" --voice my-voice -o hello.wav
+
+# Use reference audio directly
+wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
+```
+
+### `wavhost voice`
+
+Manage local voice library.
+
+#### `wavhost voice create <name> --ref <audio>`
+
+Create and save a voice from reference audio.
+
+**Options:**
+- `--ref PATH` (required): Path to reference audio file
+- `--desc TEXT`: Voice description
+
+**Example:**
+```bash
+wavhost voice create narrator --ref voice.wav --desc "Professional narrator voice"
+```
+
+#### `wavhost voice list`
+
+List all saved voices.
+
+**Example:**
+```bash
+wavhost voice list
+```
+
+#### `wavhost voice show <name>`
+
+Show details about a saved voice.
+
+**Example:**
+```bash
+wavhost voice show narrator
+```
+
+#### `wavhost voice rm <name>`
+
+Remove a saved voice.
+
+**Options:**
+- `-y, --yes`: Skip confirmation prompt
+
+**Example:**
+```bash
+wavhost voice rm narrator
 ```
 
 ### `wavhost serve`
@@ -187,7 +258,7 @@ Generate speech from text (OpenAI-compatible).
 **Parameters:**
 - `model` (string, required): Model to use
 - `input` (string, required): Text to synthesize (max 4096 chars)
-- `voice` (string, optional): Voice identifier (default: "default")
+- `voice` (string, optional): Voice name from local library, or `"default"` for built-in voice
 - `response_format` (string, optional): Audio format. Defaults to `mp3`.
   - Encoded: `mp3`, `wav`, `opus`, `flac`, `aac`
   - Raw PCM (signed 16-bit little-endian): `pcm` (model native rate), `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`
@@ -250,11 +321,17 @@ Wavhost uses Ollama-style content-addressed storage:
           latest/
             ve.safetensors
             ...
+  voices/
+    manifests/
+      <voice_name>.json
+    blobs/
+      sha256-<hash>
 ```
 
 - **Manifests**: Model metadata and layer digests
 - **Blobs**: Content-addressed file storage with SHA-256 deduplication
 - **Checkpoints**: Materialized directories (hardlinks/copies of blobs) loaded by `from_local`
+- **Voices**: Saved voice library with reference audio and metadata
 
 ### Backends
 
@@ -309,10 +386,10 @@ mypy wavhost
 - ✅ Chatterbox backend
 - ✅ CLI (pull, run, serve)
 - ✅ OpenAI-compatible API
+- ✅ Local voice library (create, save, manage)
 
 ### Future
 - Additional backends (Qwen3-TTS, etc.)
-- Voice cloning support
 - Streaming audio generation
 - Model quantization
 - Multi-language models

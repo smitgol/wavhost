@@ -25,6 +25,7 @@ from wavhost.exceptions import (
 from wavhost.logging_config import setup_logger
 from wavhost.registry import ModelRegistry
 from wavhost.storage import WavhostStorage
+from wavhost.voices import VoiceStorage, VoiceNotFoundError, VoiceAlreadyExistsError
 
 logger = setup_logger(__name__)
 
@@ -200,7 +201,7 @@ def _pull_model(storage: WavhostStorage, model_info, *, force: bool = False) -> 
 @click.argument("model_name")
 @click.argument("text")
 @click.option("-o", "--output", type=click.Path(), help="Output WAV file path")
-@click.option("--voice", type=click.Path(exists=True), help="Reference voice audio for cloning")
+@click.option("--voice", type=str, help="Voice name from local library, or path to reference audio")
 @click.option("--device", type=str, help="Device to use (cuda/cpu/mps)")
 def run(
     model_name: str,
@@ -216,6 +217,7 @@ def run(
     try:
         storage = WavhostStorage()
         registry = ModelRegistry()
+        voice_storage = VoiceStorage()
         
         model_info = registry.get_model_info(model_name)
         
@@ -244,7 +246,27 @@ def run(
                 manifest["layers"],
             )
         
-        _generate_speech(model_info, text, output, voice, device, checkpoint)
+        # Resolve voice parameter (name or path)
+        voice_handle = None
+        voice_path = None
+        if voice:
+            # Check if it's a saved voice name
+            if voice_storage.voice_exists(voice):
+                ref_audio_path = voice_storage.get_voice_ref_audio_path(voice)
+                voice_handle = {"ref_audio_path": str(ref_audio_path)}
+                click.echo(f"Using saved voice: {voice}")
+            else:
+                # Treat as a file path
+                voice_path_obj = Path(voice)
+                if voice_path_obj.exists():
+                    voice_path = voice
+                else:
+                    click.echo(
+                        f"Warning: Voice '{voice}' not found as saved voice or file path",
+                        err=True
+                    )
+        
+        _generate_speech(model_info, text, output, voice_path, device, checkpoint, voice_handle)
         
     except (ModelNotFoundError, ModelNotInstalledError, BackendError) as e:
         handle_error(e)
@@ -259,6 +281,7 @@ def _generate_speech(
     voice: Optional[str],
     device: Optional[str],
     checkpoint: Path,
+    voice_handle: Optional[dict] = None,
 ) -> None:
     """Generate speech and save to file.
     
@@ -269,6 +292,7 @@ def _generate_speech(
         voice: Optional reference voice path
         device: Optional device override
         checkpoint: Local checkpoint directory
+        voice_handle: Optional voice handle (dict)
     """
     click.echo(f"Loading model: {model_info.name}")
     
@@ -279,7 +303,7 @@ def _generate_speech(
     backend = create_backend(model_info, device=device, checkpoint_path=checkpoint)
     
     click.echo(f"Generating speech for: '{text}'")
-    wav, sr = backend.generate(text, voice=voice)
+    wav, sr = backend.generate(text, voice=voice, voice_handle=voice_handle)
     
     output_path = Path(output or DEFAULT_OUTPUT_FILENAME)
     torchaudio.save(str(output_path), wav, sr)
@@ -463,6 +487,139 @@ def uninstall(purge_data: bool, yes: bool) -> None:
         click.echo()
         click.echo("Optional — also remove the Chatterbox engine:")
         click.echo(f"  {sys.executable} -m pip uninstall chatterbox-tts")
+    except Exception as e:
+        handle_error(e)
+
+
+# Voice management commands
+@main.group()
+def voice():
+    """Manage local voice library.
+    
+    Create, list, and manage saved voices for TTS generation.
+    """
+    pass
+
+
+@voice.command("create")
+@click.argument("name")
+@click.option("--ref", type=click.Path(exists=True), required=True, help="Reference audio file")
+@click.option("--desc", type=str, help="Voice description")
+def voice_create(name: str, ref: str, desc: Optional[str]) -> None:
+    """Create a new voice from reference audio.
+    
+    Example: wavhost voice create my-voice --ref audio.wav --desc "My custom voice"
+    """
+    try:
+        voice_storage = VoiceStorage()
+        ref_path = Path(ref)
+        
+        manifest = voice_storage.create_voice(
+            name=name,
+            ref_audio_path=ref_path,
+            description=desc,
+        )
+        
+        click.echo(f"✓ Created voice: {name}")
+        if desc:
+            click.echo(f"  Description: {desc}")
+        click.echo(f"  Reference: {ref}")
+        click.echo(f"\nUse with: wavhost run <model> 'text' --voice {name}")
+        
+    except VoiceAlreadyExistsError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo(f"Use a different name or remove the existing voice first.", err=True)
+        sys.exit(1)
+    except Exception as e:
+        handle_error(e)
+
+
+@voice.command("list")
+def voice_list() -> None:
+    """List all saved voices.
+    
+    Example: wavhost voice list
+    """
+    try:
+        voice_storage = VoiceStorage()
+        voices = voice_storage.list_voices()
+        
+        if not voices:
+            click.echo("No voices saved yet.")
+            click.echo("\nCreate one with: wavhost voice create <name> --ref <audio>")
+            return
+        
+        click.echo(f"Saved voices ({len(voices)}):")
+        for v in voices:
+            name = v["name"]
+            desc = v.get("description", "")
+            backend = v.get("backend", "")
+            click.echo(f"  {name:<20} - {desc if desc else f'({backend})'}")
+        
+    except Exception as e:
+        handle_error(e)
+
+
+@voice.command("show")
+@click.argument("name")
+def voice_show(name: str) -> None:
+    """Show details about a saved voice.
+    
+    Example: wavhost voice show my-voice
+    """
+    try:
+        voice_storage = VoiceStorage()
+        manifest = voice_storage.get_voice(name)
+        
+        click.echo(f"Voice: {manifest['name']}")
+        if manifest.get("description"):
+            click.echo(f"Description: {manifest['description']}")
+        click.echo(f"Backend: {manifest.get('backend', 'unknown')}")
+        
+        ref_info = manifest.get("ref_audio", {})
+        if ref_info:
+            click.echo(f"\nReference audio:")
+            click.echo(f"  Original file: {ref_info.get('original_filename', 'unknown')}")
+            click.echo(f"  Size: {ref_info.get('size', 0):,} bytes")
+            click.echo(f"  Digest: {ref_info.get('digest', '')[:12]}...")
+        
+        metadata = manifest.get("metadata", {})
+        if metadata:
+            click.echo(f"\nMetadata: {metadata}")
+        
+    except VoiceNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo(f"\nList available voices with: wavhost voice list", err=True)
+        sys.exit(1)
+    except Exception as e:
+        handle_error(e)
+
+
+@voice.command("rm")
+@click.argument("name")
+@click.option("-y", "--yes", is_flag=True, help="Skip confirmation prompt")
+def voice_remove(name: str, yes: bool) -> None:
+    """Remove a saved voice.
+    
+    Example: wavhost voice rm my-voice
+    """
+    try:
+        voice_storage = VoiceStorage()
+        
+        if not voice_storage.voice_exists(name):
+            click.echo(f"Error: Voice '{name}' not found", err=True)
+            sys.exit(1)
+        
+        if not yes and not click.confirm(f"Remove voice '{name}'?", default=True):
+            click.echo("Aborted.")
+            return
+        
+        if voice_storage.delete_voice(name):
+            click.echo(f"✓ Removed voice: {name}")
+        else:
+            click.echo(f"Error: Voice '{name}' not found", err=True)
+            sys.exit(1)
+        
     except Exception as e:
         handle_error(e)
 
