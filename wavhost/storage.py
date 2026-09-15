@@ -494,6 +494,12 @@ class WavhostStorage:
                 )
 
             target = ckpt_dir / filename
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                raise StorageError(
+                    f"Failed to create checkpoint path for {filename}: {e}"
+                ) from e
             if target.exists():
                 try:
                     if target.samefile(blob_path):
@@ -527,6 +533,25 @@ class WavhostStorage:
             return False
         return all((ckpt_dir / layer["filename"]).exists() for layer in layers)
 
+    def ensure_checkpoint(self, model_info: Any) -> Path:
+        """Return a ready checkpoint path, materializing from blobs if needed."""
+        ns, name, tag = model_info.namespace, model_info.name, model_info.tag
+        if not self.manifest_exists(ns, name, tag):
+            from wavhost.exceptions import ModelNotInstalledError
+
+            raise ModelNotInstalledError(name)
+
+        manifest = self.load_manifest(ns, name, tag)
+        if not manifest or not manifest.get("layers"):
+            from wavhost.exceptions import ModelNotInstalledError
+
+            raise ModelNotInstalledError(name)
+
+        layers = manifest["layers"]
+        if not self.checkpoint_ready(ns, name, tag, layers):
+            self.materialize_checkpoint(ns, name, tag, layers)
+        return self.get_checkpoint_path(ns, name, tag)
+
     def pull_layers(
         self,
         model_info: Any,
@@ -541,7 +566,8 @@ class WavhostStorage:
 
         Args:
             model_info: Registry ModelInfo with layers
-            force: Re-download even when blobs already exist
+            force: Unused here — CLI ``--force`` only re-runs pull when a
+                finished manifest already exists; blobs are always resumed
             show_progress: Show download progress bars
 
         Returns:

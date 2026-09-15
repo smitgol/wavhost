@@ -15,8 +15,13 @@ def test_registry_list_models():
     assert "chatterbox-turbo" in models
     assert "chatterbox-nano" in models
     assert "chatterbox-base" in models
-    assert "qwen-0.6b" in models
-    assert "qwen-1.7b" in models
+    assert "chatterbox-multilingual" in models
+    assert "qwen-0.6-customvoice" in models
+    assert "qwen-0.6-base" in models
+    assert "qwen-1.7-customvoice" in models
+    assert "qwen-1.7-base" in models
+    assert "qwen-0.6b" not in models
+    assert "qwen-1.7b" not in models
 
 
 def test_get_model_info():
@@ -110,15 +115,29 @@ def test_get_all_models():
     assert len(all_models) >= 5
     assert "chatterbox-turbo" in all_models
     assert "chatterbox-nano" in all_models
-    assert "qwen-0.6b" in all_models
+    assert "qwen-0.6-customvoice" in all_models
 
 
 def test_qwen_models_registered():
-    """Test Qwen models are registered with correct backend."""
+    """CustomVoice and Base Qwen variants are registered separately."""
     registry = ModelRegistry()
-    
-    assert registry.get_model_info("qwen-0.6b").backend == "qwen"
-    assert registry.get_model_info("qwen-1.7b").backend == "qwen"
+
+    custom = registry.get_model_info("qwen-0.6-customvoice")
+    assert custom.backend == "qwen"
+    assert custom.huggingface_repo.endswith("CustomVoice")
+    assert custom.model_kwargs["task"] == "custom_voice"
+    assert custom.model_kwargs["default_speaker"] == "Ryan"
+
+    assert (
+        registry.get_model_info("qwen-1.7-customvoice").model_kwargs["task"]
+        == "custom_voice"
+    )
+
+    base = registry.get_model_info("qwen-0.6-base")
+    assert base.huggingface_repo.endswith("Base")
+    assert base.model_kwargs["task"] == "voice_clone"
+    assert registry.get_model_info("qwen-1.7-base").model_kwargs["task"] == "voice_clone"
+
 
 
 def test_chatterbox_nano_model_kwargs():
@@ -128,3 +147,13 @@ def test_chatterbox_nano_model_kwargs():
     
     assert nano.backend == "chatterbox"
     assert nano.model_kwargs == {"nano": True}
+
+
+def test_chatterbox_multilingual_registered():
+    registry = ModelRegistry()
+    mtl = registry.get_model_info("chatterbox-multilingual")
+    assert mtl.backend == "chatterbox"
+    assert mtl.model_class == "ChatterboxMultilingualTTS"
+    assert mtl.model_kwargs.get("default_language") == "en"
+    assert "fr" in mtl.languages and "zh" in mtl.languages
+    assert any(layer.filename == "t3_mtl23ls_v2.safetensors" for layer in mtl.layers)

@@ -42,9 +42,3 @@ class DownloadError(WavhostError):
     """Raised when a model layer download fails."""
 
     pass
-
-
-class ValidationError(WavhostError):
-    """Raised when input validation fails."""
-
-    pass

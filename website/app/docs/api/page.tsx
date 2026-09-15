@@ -100,7 +100,17 @@ export default function APIPage() {
                 </td>
                 <td>string</td>
                 <td>
-                  Optional. Saved voice name, or <code>default</code>
+                  Optional. Saved voice, Qwen speaker (<code>Ryan</code>, …), path, or{" "}
+                  <code>default</code>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>language</code>
+                </td>
+                <td>
+                  Optional. Chatterbox Multilingual ISO code (<code>fr</code>,{" "}
+                  <code>zh</code>, …) or Qwen language name
                 </td>
               </tr>
               <tr>

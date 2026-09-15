@@ -1,59 +1,82 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-
-interface NavLinkProps {
-  href: string;
-  children: React.ReactNode;
-  current?: boolean;
-}
-
-function NavLink({ href, children, current }: NavLinkProps) {
-  return (
-    <Link 
-      href={href}
-      aria-current={current ? "page" : undefined}
-    >
-      {children}
-    </Link>
-  );
-}
 
 interface NavigationProps {
   currentPath?: string;
   variant?: "default" | "docs";
 }
 
-export function Navigation({ currentPath = "/", variant = "default" }: NavigationProps) {
+export function Navigation({
+  currentPath = "/",
+  variant = "default",
+}: NavigationProps) {
   const isDocs = variant === "docs";
-  
+
   return (
     <header className={isDocs ? "nav docs-top" : "nav"}>
       <div className={isDocs ? "docs-top-inner" : "wrap nav-inner"}>
         <Link className="wordmark" href="/">
           Wavhost
         </Link>
-        <nav className={isDocs ? "docs-top-nav" : undefined} aria-label="Primary">
+        <nav
+          className={
+            isDocs
+              ? "docs-top-nav flex items-center gap-1"
+              : "flex items-center gap-1"
+          }
+          aria-label="Primary"
+        >
           {isDocs ? (
             <>
-              <NavLink href="/docs" current={currentPath.startsWith("/docs")}>
-                Docs
-              </NavLink>
-              <NavLink href="/models">Models</NavLink>
-              <a href="https://github.com/smitgol/wavhost" rel="noopener noreferrer">
-                GitHub
-              </a>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                aria-current={currentPath.startsWith("/docs") ? "page" : undefined}
+              >
+                <Link href="/docs">Docs</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/models">Models</Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <a
+                  href="https://github.com/smitgol/wavhost"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              </Button>
             </>
           ) : (
             <>
-              <a href="https://github.com/smitgol/wavhost" rel="noopener noreferrer">
-                GitHub
-              </a>
-              <NavLink href="/models" current={currentPath === "/models"}>
-                Models
-              </NavLink>
-              <NavLink href="/docs" current={currentPath.startsWith("/docs")}>
-                Docs
-              </NavLink>
+              <Button asChild variant="ghost" size="sm">
+                <a
+                  href="https://github.com/smitgol/wavhost"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                aria-current={currentPath === "/models" ? "page" : undefined}
+              >
+                <Link href="/models">Models</Link>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                aria-current={
+                  currentPath.startsWith("/docs") ? "page" : undefined
+                }
+              >
+                <Link href="/docs">Docs</Link>
+              </Button>
             </>
           )}
           <ThemeToggle />

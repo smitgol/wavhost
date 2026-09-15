@@ -144,17 +144,26 @@ wavhost voice rm my-narrator
 
 ## Available Models
 
-| Model | Size | Device | Description |
-|-------|------|--------|-------------|
-| `chatterbox-turbo` | 350M | GPU | Fast, high-quality English TTS (MIT) |
-| `chatterbox-nano` | 110M | CPU/GPU | Lightweight, CPU-optimized English TTS (MIT) |
-| `chatterbox-base` | 500M | GPU | Original high-quality model (MIT) |
-| `qwen-0.6b` | 600M | GPU | Multilingual voice cloning (Apache-2.0) |
-| `qwen-1.7b` | 1.7B | GPU | Multilingual voice cloning, higher quality (Apache-2.0) |
+| Model | Size | Device | Languages | Description |
+|-------|------|--------|-----------|-------------|
+| `chatterbox-turbo` | 350M | GPU | English | Fast, high-quality English TTS (MIT) |
+| `chatterbox-nano` | 110M | CPU/GPU | English | Lightweight, CPU-optimized English TTS (MIT) |
+| `chatterbox-base` | 500M | GPU | English | Original high-quality English TTS (MIT) |
+| `chatterbox-multilingual` | 500M | GPU | 23 langs | Multilingual TTS + cloning (MIT) |
+| `qwen-0.6-customvoice` | 600M | GPU | 10 langs | CustomVoice: 9 speakers, default **Ryan** (Apache-2.0) |
+| `qwen-0.6-base` | 600M | GPU | 10 langs | Base: voice cloning from reference audio (Apache-2.0) |
+| `qwen-1.7-customvoice` | 1.7B | GPU | 10 langs | CustomVoice + style instructions, default **Ryan** (Apache-2.0) |
+| `qwen-1.7-base` | 1.7B | GPU | 10 langs | Base: higher-quality voice cloning (Apache-2.0) |
 
-**Chatterbox models** (MIT License by Resemble AI) focus on high-quality English synthesis with built-in voices. Nano is optimized for CPU inference (3× realtime on 8 cores) and edge deployment.
+**Chatterbox models** (MIT License by Resemble AI):
 
-**Qwen3-TTS models** (Apache-2.0 by Alibaba) support 10 languages (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian) and require a reference voice for cloning. Use with `--voice` to specify a saved voice or reference audio file.
+- **English** (`chatterbox-turbo`, `chatterbox-nano`, `chatterbox-base`): built-in stock voice and reference-audio cloning. Nano is optimized for CPU inference (3× realtime on 8 cores).
+- **Multilingual** (`chatterbox-multilingual`): **23 languages** — Arabic, Danish, German, Greek, English, Spanish, Finnish, French, Hebrew, Hindi, Italian, Japanese, Korean, Malay, Dutch, Norwegian, Polish, Portuguese, Russian, Swedish, Swahili, Turkish, Chinese. Pass `--language fr` (ISO code). Uses the built-in voice or `--voice` for cloning.
+
+**Qwen3-TTS models** (Apache-2.0 by Alibaba) support **10 languages**: Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian. CustomVoice also exposes dialect-native speakers (Beijing / Sichuan via Dylan and Eric).
+
+- **CustomVoice** (`qwen-0.6-customvoice`, `qwen-1.7-customvoice`): nine built-in speakers. Default is `Ryan` (English). Other speakers: `Aiden` (English), `Vivian` / `Serena` / `Uncle_Fu` (Chinese), `Dylan` (Beijing), `Eric` (Sichuan), `Ono_Anna` (Japanese), `Sohee` (Korean). No reference audio required.
+- **Base** (`qwen-0.6-base`, `qwen-1.7-base`): zero-shot cloning in any supported language. Pass `--voice` with a saved voice or a reference audio file.
 
 ## CLI Reference
 
@@ -177,7 +186,8 @@ Generate speech from text using a local model.
 
 **Options:**
 - `-o, --output PATH`: Output WAV file path (default: `output.wav`)
-- `--voice NAME_OR_PATH`: Saved voice name from local library, or path to reference audio
+- `--voice NAME_OR_PATH`: Saved voice, reference audio path, or Qwen CustomVoice speaker (`Ryan`, `Aiden`, ...)
+- `--language, -l CODE_OR_NAME`: Language for synthesis (Chatterbox Multilingual ISO codes like `fr`; Qwen names like `English`)
 - `--device DEVICE`: Device to use (`cuda`, `cpu`, or `mps`)
 
 **Example:**
@@ -189,6 +199,12 @@ wavhost run chatterbox-turbo "Hello" --voice my-voice -o hello.wav
 
 # Use reference audio directly
 wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
+
+# Qwen CustomVoice named speaker
+wavhost run qwen-0.6-customvoice "Hello" --voice Aiden -o aiden.wav
+
+# Chatterbox Multilingual (ISO language code)
+wavhost run chatterbox-multilingual "Bonjour, comment ça va?" --language fr -o fr.wav
 ```
 
 ### `wavhost voice`
@@ -575,16 +591,12 @@ Wavhost uses Ollama-style content-addressed storage:
 
 ### Backends
 
-The `TTSBackend` protocol enables pluggable TTS engines:
+Pluggable engines behind a thin `TTSBackend` protocol:
 
-- **Chatterbox**: MIT-licensed models by Resemble AI (currently implemented)
-- Supports voice creation and cloning from reference audio
-- Future backends can be added by implementing the `TTSBackend` protocol
+- **Chatterbox** (MIT, Resemble AI): English TTS + reference-audio cloning
+- **Qwen3-TTS** (Apache-2.0, Alibaba): CustomVoice named speakers and Base cloning
 
-**Voice Handles:** Each backend implements voice creation differently:
-- Chatterbox stores reference audio paths for on-the-fly cloning
-- Future backends may use embeddings or other voice representations
-- The voice storage layer is backend-agnostic
+Voice library storage is backend-agnostic — it keeps reference audio; each engine decides how to use it at generate time.
 
 ## Hardware Requirements
 
@@ -678,16 +690,15 @@ mypy wavhost
 
 ### v0.1 (Current)
 - ✅ Ollama-style storage
-- ✅ Chatterbox backend
+- ✅ Chatterbox + Qwen3-TTS backends
 - ✅ CLI (pull, run, serve)
 - ✅ OpenAI-compatible API
 - ✅ Local voice library (create, save, manage via CLI and API)
 
 ### Future
-- Additional backends (Qwen3-TTS, etc.)
 - Streaming audio generation
 - Model quantization
-- Multi-language models
+- More backends
 
 ## Use Cases
 
@@ -715,6 +726,7 @@ mypy wavhost
 
 **Third-party models:** Each model is subject to its own license:
 - Chatterbox models: MIT License (see [Resemble AI's license](https://github.com/resemble-ai/chatterbox/blob/main/LICENSE))
+- Qwen3-TTS models: Apache-2.0 (see [Qwen3-TTS license](https://github.com/QwenLM/Qwen3-TTS/blob/main/LICENSE))
 
 Model licenses are displayed before download with `wavhost pull`.
 
@@ -724,7 +736,8 @@ Contributions welcome! Please feel free to submit issues and pull requests.
 
 ## Acknowledgments
 
-- [Resemble AI](https://resemble.ai) for the excellent Chatterbox TTS models
+- [Resemble AI](https://resemble.ai) for Chatterbox TTS
+- [Qwen / Alibaba](https://github.com/QwenLM/Qwen3-TTS) for Qwen3-TTS
 - [Ollama](https://ollama.ai) for storage architecture inspiration
 - [OpenAI](https://openai.com) for the audio API specification
 

@@ -3,7 +3,7 @@
 import tempfile
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 import torch
 import torchaudio
@@ -21,7 +21,13 @@ from wavhost.exceptions import (
 from wavhost.logging_config import get_logger
 from wavhost.registry import ModelRegistry
 from wavhost.storage import WavhostStorage
-from wavhost.voices import VoiceStorage, VoiceNotFoundError, VoiceAlreadyExistsError, VoiceError
+from wavhost.voices import (
+    VoiceAlreadyExistsError,
+    VoiceError,
+    VoiceNotFoundError,
+    VoiceStorage,
+    resolve_voice,
+)
 
 logger = get_logger(__name__)
 
@@ -77,7 +83,18 @@ class SpeechRequest(BaseModel):
     )
     voice: str = Field(
         default="default",
-        description="Voice name from local library, or 'default' for built-in voice"
+        description=(
+            "Voice to use: 'default' (model built-in / Qwen Ryan), a CustomVoice "
+            "speaker name (Ryan, Aiden, ...), a saved voice, or a reference audio "
+            "path (Qwen Base / Chatterbox)"
+        ),
+    )
+    language: Optional[str] = Field(
+        default=None,
+        description=(
+            "Language for synthesis. Chatterbox Multilingual: ISO code "
+            "(en, fr, zh, …). Qwen: English, Chinese, Japanese, …"
+        ),
     )
     response_format: AudioFormat = Field(
         default=AudioFormat.MP3,
@@ -211,6 +228,13 @@ class AudioConverter:
 
             if target_format == AudioFormat.OPUS:
                 save_kwargs["bits_per_sample"] = 16
+            elif target_format == AudioFormat.WAV:
+                # Avoid float32 WAV — many players decode it incorrectly.
+                save_kwargs["encoding"] = "PCM_S"
+                save_kwargs["bits_per_sample"] = 16
+                audio_tensor = (
+                    audio_tensor.detach().float().cpu().clamp(-1.0, 1.0)
+                )
 
             torchaudio.save(
                 str(tmp_path),
@@ -327,60 +351,25 @@ async def create_speech(request: SpeechRequest):
         voice_storage = VoiceStorage()
         
         model_info = registry.get_model_info(request.model)
-        
-        if not storage.manifest_exists(
-            model_info.namespace,
-            model_info.name,
-            model_info.tag
-        ):
-            raise ModelNotInstalledError(request.model)
-        
-        manifest = storage.load_manifest(
-            model_info.namespace,
-            model_info.name,
-            model_info.tag,
-        )
-        if not manifest or not manifest.get("layers"):
-            raise ModelNotInstalledError(request.model)
-        
-        if not storage.checkpoint_ready(
-            model_info.namespace,
-            model_info.name,
-            model_info.tag,
-            manifest["layers"],
-        ):
-            storage.materialize_checkpoint(
-                model_info.namespace,
-                model_info.name,
-                model_info.tag,
-                manifest["layers"],
-            )
-        
-        checkpoint = storage.get_checkpoint_path(
-            model_info.namespace,
-            model_info.name,
-            model_info.tag,
-        )
-        
+        checkpoint = storage.ensure_checkpoint(model_info)
         backend = create_backend(model_info, checkpoint_path=checkpoint)
-        
-        # Resolve voice parameter
-        voice_handle = None
-        if request.voice and request.voice != "default":
-            try:
-                ref_audio_path = voice_storage.get_voice_ref_audio_path(request.voice)
-                voice_handle = {"ref_audio_path": str(ref_audio_path)}
-                logger.info(f"Using saved voice: {request.voice}")
-            except VoiceNotFoundError:
-                logger.warning(f"Voice '{request.voice}' not found")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Voice '{request.voice}' not found. Use 'default' or create a voice with: wavhost voice create {request.voice} --ref <audio>"
-                )
-        
-        logger.info(f"Generating speech for model={request.model}, length={len(request.input)}")
-        wav, sr = backend.generate(request.input, voice_handle=voice_handle)
-        
+
+        voice_arg, voice_handle = resolve_voice(request.voice, voice_storage)
+        if voice_handle:
+            logger.info(f"Using saved voice: {request.voice}")
+        elif voice_arg:
+            logger.info(f"Using voice/speaker: {voice_arg}")
+
+        logger.info(
+            f"Generating speech for model={request.model}, length={len(request.input)}"
+        )
+        wav, sr = backend.generate(
+            request.input,
+            voice=voice_arg,
+            voice_handle=voice_handle,
+            **({"language": request.language} if request.language else {}),
+        )
+
         audio_bytes = AudioConverter.convert(wav, sr, request.response_format)
         media_type = AudioConverter.get_media_type(request.response_format)
         filename = AudioConverter.get_filename(request.response_format)
