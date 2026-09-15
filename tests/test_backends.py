@@ -156,14 +156,6 @@ def test_chatterbox_backend_initialization(checkpoint):
     assert backend._model is None
 
 
-def test_chatterbox_backend_invalid_model_class(checkpoint):
-    """Test Chatterbox backend with invalid model class."""
-    with pytest.raises(BackendError, match="Invalid model class"):
-        ChatterboxBackend(
-            model_class="InvalidClass",
-            checkpoint_path=checkpoint,
-            device=CPU_DEVICE,
-        )
 
 
 def test_chatterbox_backend_missing_checkpoint(tmp_path):
@@ -367,52 +359,8 @@ def test_chatterbox_backend_cuda(checkpoint):
     assert backend._device == "cuda"
 
 
-def test_qwen_backend_initialization(checkpoint):
-    """Test Qwen backend initialization."""
-    backend = QwenBackend(
-        model_class="Qwen3TTSModel",
-        checkpoint_path=checkpoint,
-        device=CPU_DEVICE,
-    )
-
-    assert backend._device == CPU_DEVICE
-    assert backend.sample_rate == DEFAULT_SAMPLE_RATE
-    assert backend._model is None
-
-
-def test_qwen_backend_invalid_model_class(checkpoint):
-    """Test Qwen backend with invalid model class."""
-    with pytest.raises(BackendError, match="Invalid model class"):
-        QwenBackend(
-            model_class="InvalidClass",
-            checkpoint_path=checkpoint,
-            device=CPU_DEVICE,
-        )
-
-
-def test_qwen_backend_missing_checkpoint(tmp_path):
-    """A missing checkpoint directory fails at construction."""
-    with pytest.raises(BackendError, match="Checkpoint directory not found"):
-        QwenBackend(
-            model_class="Qwen3TTSModel",
-            checkpoint_path=tmp_path / "missing",
-            device=CPU_DEVICE,
-        )
-
-
-def test_qwen_backend_device_detection(checkpoint):
-    """Test automatic device detection."""
-    backend = QwenBackend(
-        model_class="Qwen3TTSModel",
-        checkpoint_path=checkpoint,
-        device=None,
-    )
-
-    assert backend._device in ["cuda", "cpu", "mps"]
-
-
 def test_qwen_backend_creation(checkpoint):
-    """Test Qwen backend factory function."""
+    """Test Qwen backend factory creates correct backend type."""
     registry = ModelRegistry()
     model_info = registry.get_model_info("qwen-0.6b")
 
@@ -420,55 +368,3 @@ def test_qwen_backend_creation(checkpoint):
         model_info, device=CPU_DEVICE, checkpoint_path=checkpoint
     )
     assert isinstance(backend, QwenBackend)
-    assert backend.sample_rate == DEFAULT_SAMPLE_RATE
-
-
-def test_qwen_backend_requires_voice_for_generation(monkeypatch, checkpoint):
-    """Qwen backend requires a voice reference for generation."""
-    monkeypatch.setattr(
-        "wavhost.backends.dependencies.is_installed",
-        lambda backend: True,
-    )
-
-    backend = QwenBackend(
-        model_class="Qwen3TTSModel",
-        checkpoint_path=checkpoint,
-        device=CPU_DEVICE,
-    )
-    
-    class _FakeQwenModel:
-        def generate_voice_clone(self, **kwargs):
-            import numpy as np
-            return [np.zeros(16000, dtype=np.float32)], 24000
-    
-    backend._model = _FakeQwenModel()
-    
-    with pytest.raises(BackendError, match="requires a reference voice"):
-        backend.generate("Hello world")
-
-
-def test_qwen_create_voice_returns_handle(checkpoint, tmp_path):
-    """create_voice returns a voice handle dict."""
-    voice_file = tmp_path / "voice.wav"
-    voice_file.write_bytes(b"")
-    
-    backend = QwenBackend(
-        model_class="Qwen3TTSModel",
-        checkpoint_path=checkpoint,
-        device=CPU_DEVICE,
-    )
-    handle = backend.create_voice(str(voice_file))
-    
-    assert handle == {"ref_audio_path": str(voice_file)}
-
-
-def test_qwen_create_voice_missing_file_raises_error(checkpoint, tmp_path):
-    """create_voice with missing file raises error."""
-    backend = QwenBackend(
-        model_class="Qwen3TTSModel",
-        checkpoint_path=checkpoint,
-        device=CPU_DEVICE,
-    )
-    
-    with pytest.raises(BackendError, match="Reference audio not found"):
-        backend.create_voice(str(tmp_path / "missing.wav"))

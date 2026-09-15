@@ -18,6 +18,19 @@ BACKEND_NAME = "chatterbox"
 QWEN_BACKEND_NAME = "qwen"
 
 
+def _detect_device() -> str:
+    """Detect the best available device.
+    
+    Returns:
+        Device string ('cuda', 'mps', or 'cpu')
+    """
+    if torch.cuda.is_available():
+        return DEFAULT_DEVICE
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return "mps"
+    return CPU_DEVICE
+
+
 class TTSBackend(Protocol):
     """Protocol for TTS backend implementations.
     
@@ -98,18 +111,16 @@ class ChatterboxBackend:
         Args:
             model_class: Name of the model class ('ChatterboxTTS' or 'ChatterboxTurboTTS')
             checkpoint_path: Local directory with model files (from pull)
-            model_kwargs: Unused; kept for API compatibility
+            model_kwargs: Optional kwargs passed to from_local (e.g. nano=True)
             device: Device to run on ('cuda', 'cpu', or 'mps'). Auto-detects if None.
             
         Raises:
-            BackendError: If model class is invalid or checkpoint is missing
+            BackendError: If checkpoint is missing
         """
-        self._validate_model_class(model_class)
-        
         self._model_class = model_class
         self._model_kwargs = model_kwargs or {}
         self._checkpoint_path = Path(checkpoint_path)
-        self._device = device or self._detect_device()
+        self._device = device or _detect_device()
         self._model = None
         self._sr = DEFAULT_SAMPLE_RATE
         
@@ -123,36 +134,6 @@ class ChatterboxBackend:
             f"Initialized {model_class} backend on {self._device} "
             f"from {self._checkpoint_path}"
         )
-    
-    @staticmethod
-    def _validate_model_class(model_class: str) -> None:
-        """Validate that the model class is supported.
-        
-        Args:
-            model_class: Model class name
-            
-        Raises:
-            BackendError: If model class is invalid
-        """
-        valid_classes = {"ChatterboxTTS", "ChatterboxTurboTTS"}
-        if model_class not in valid_classes:
-            raise BackendError(
-                f"Invalid model class '{model_class}'. "
-                f"Must be one of: {', '.join(valid_classes)}"
-            )
-    
-    @staticmethod
-    def _detect_device() -> str:
-        """Detect the best available device.
-        
-        Returns:
-            Device string ('cuda', 'mps', or 'cpu')
-        """
-        if torch.cuda.is_available():
-            return DEFAULT_DEVICE
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            return "mps"
-        return CPU_DEVICE
     
     def _load_model(self) -> None:
         """Lazy load the model on first use from the local checkpoint.
@@ -311,20 +292,18 @@ class QwenBackend:
         """Initialize Qwen backend.
         
         Args:
-            model_class: Name of the model class ('Qwen3TTSModel')
+            model_class: Name of the model class (unused, kept for API compatibility)
             checkpoint_path: Local directory with model files (from pull)
             model_kwargs: Optional model initialization kwargs
             device: Device to run on ('cuda', 'cpu', or 'mps'). Auto-detects if None.
             
         Raises:
-            BackendError: If model class is invalid or checkpoint is missing
+            BackendError: If checkpoint is missing
         """
-        self._validate_model_class(model_class)
-        
         self._model_class = model_class
         self._model_kwargs = model_kwargs or {}
         self._checkpoint_path = Path(checkpoint_path)
-        self._device = device or self._detect_device()
+        self._device = device or _detect_device()
         self._model = None
         self._sr = DEFAULT_SAMPLE_RATE
         
@@ -335,39 +314,9 @@ class QwenBackend:
             )
         
         logger.info(
-            f"Initialized {model_class} backend on {self._device} "
+            f"Initialized Qwen3-TTS backend on {self._device} "
             f"from {self._checkpoint_path}"
         )
-    
-    @staticmethod
-    def _validate_model_class(model_class: str) -> None:
-        """Validate that the model class is supported.
-        
-        Args:
-            model_class: Model class name
-            
-        Raises:
-            BackendError: If model class is invalid
-        """
-        valid_classes = {"Qwen3TTSModel"}
-        if model_class not in valid_classes:
-            raise BackendError(
-                f"Invalid model class '{model_class}'. "
-                f"Must be one of: {', '.join(valid_classes)}"
-            )
-    
-    @staticmethod
-    def _detect_device() -> str:
-        """Detect the best available device.
-        
-        Returns:
-            Device string ('cuda', 'mps', or 'cpu')
-        """
-        if torch.cuda.is_available():
-            return DEFAULT_DEVICE
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            return "mps"
-        return CPU_DEVICE
     
     def _load_model(self) -> None:
         """Lazy load the model on first use from the local checkpoint.
