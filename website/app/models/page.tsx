@@ -4,9 +4,6 @@ import type { Metadata } from "next";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
 import { CopyButton } from "@/components/CopyButton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 export const metadata: Metadata = {
   title: "Models · Wavhost",
@@ -16,7 +13,6 @@ export const metadata: Metadata = {
 
 const CHATTERBOX_EN_LANGUAGES = ["English"] as const;
 
-/** Official Chatterbox Multilingual language list (ISO codes → names). */
 const CHATTERBOX_MTL_LANGUAGES = [
   "Arabic",
   "Danish",
@@ -43,7 +39,6 @@ const CHATTERBOX_MTL_LANGUAGES = [
   "Chinese",
 ] as const;
 
-/** Qwen3-TTS 12Hz CustomVoice / Base (official): 10 languages. */
 const QWEN_LANGUAGES = [
   "Chinese",
   "English",
@@ -90,7 +85,7 @@ const CHATTERBOX_MTL: ModelRow[] = [
     id: "chatterbox-multilingual",
     size: "500M",
     device: "GPU",
-    notes: "23 languages; pass --language fr / zh / …",
+    notes: "23 languages via --language",
   },
 ];
 
@@ -105,7 +100,7 @@ const QWEN: ModelRow[] = [
     id: "qwen-0.6-base",
     size: "600M",
     device: "GPU",
-    notes: "Voice cloning from reference audio",
+    notes: "Clone from reference audio",
   },
   {
     id: "qwen-1.7-customvoice",
@@ -121,87 +116,108 @@ const QWEN: ModelRow[] = [
   },
 ];
 
-function LanguageBadges({ languages }: { languages: readonly string[] }) {
+function LanguageList({ languages }: { languages: readonly string[] }) {
   return (
     <ul className="model-langs" aria-label="Supported languages">
       {languages.map((lang) => (
         <li key={lang}>
-          <Badge variant="outline">{lang}</Badge>
+          <span className="model-lang-pill">{lang}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-function PullChip({ modelId }: { modelId: string }) {
-  const cmd = `wavhost pull ${modelId}`;
+function CommandChip({
+  text,
+  label,
+}: {
+  text: string;
+  label: string;
+}) {
   return (
-    <div className="model-pull">
-      <code data-copy>{cmd}</code>
+    <div className="model-cmd">
+      <code data-copy>{text}</code>
       <CopyButton
-        text={cmd}
+        text={text}
         className="copy-btn copy-btn--chip"
-        label={`Copy ${cmd}`}
+        label={label}
       />
     </div>
   );
 }
 
 function ModelEntry({ model }: { model: ModelRow }) {
+  const cmd = `wavhost pull ${model.id}`;
   return (
-    <article className="model-entry">
-      <div className="model-entry-top">
-        <h3 className="model-entry-id">
-          <code>{model.id}</code>
-        </h3>
-        <p className="model-entry-meta">
-          <span>{model.size}</span>
-          <span aria-hidden="true">·</span>
-          <span>{model.device}</span>
-        </p>
+    <li className="model-entry">
+      <div className="model-entry-main">
+        <div className="model-entry-idrow">
+          <code className="model-entry-id">{model.id}</code>
+          <span className="model-entry-meta">
+            {model.size}
+            <span aria-hidden="true"> · </span>
+            {model.device}
+          </span>
+        </div>
+        <p className="model-entry-notes">{model.notes}</p>
       </div>
-      <p className="model-entry-notes">{model.notes}</p>
-      <PullChip modelId={model.id} />
-    </article>
+      <CommandChip text={cmd} label={`Copy ${cmd}`} />
+    </li>
   );
 }
 
 function ModelFamily({
+  id,
+  eyebrow,
   title,
-  badges,
+  tags,
   description,
   languages,
   models,
-  footer,
+  aside,
 }: {
+  id: string;
+  eyebrow: string;
   title: string;
-  badges: ReactNode;
+  tags: string[];
   description: ReactNode;
   languages: readonly string[];
   models: ModelRow[];
-  footer?: ReactNode;
+  aside?: ReactNode;
 }) {
   return (
-    <section className="model-family">
+    <section className="model-family" id={id} aria-labelledby={`${id}-title`}>
       <header className="model-family-head">
-        <div className="model-family-title-row">
-          <h2 className="model-family-title">{title}</h2>
-          <div className="model-family-badges">{badges}</div>
+        <div className="model-family-heading">
+          <p className="model-family-eyebrow">{eyebrow}</p>
+          <div className="model-family-title-row">
+            <h2 className="model-family-title" id={`${id}-title`}>
+              {title}
+            </h2>
+            <ul className="model-family-tags">
+              {tags.map((tag) => (
+                <li key={tag}>
+                  <span className="model-tag">{tag}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="model-family-desc">{description}</p>
         </div>
-        <p className="model-family-desc">{description}</p>
         <div className="model-family-langs">
-          <p className="model-family-langs-label">Supported languages</p>
-          <LanguageBadges languages={languages} />
+          <span className="model-family-langs-label">Languages</span>
+          <LanguageList languages={languages} />
         </div>
       </header>
 
-      <div className="model-entry-list">
+      <ul className="model-entry-list">
         {models.map((m) => (
           <ModelEntry key={m.id} model={m} />
         ))}
-      </div>
+      </ul>
 
-      {footer ? <div className="model-family-footer">{footer}</div> : null}
+      {aside ? <aside className="model-family-aside">{aside}</aside> : null}
     </section>
   );
 }
@@ -215,128 +231,101 @@ export default function ModelsPage() {
 
       <Navigation currentPath="/models" />
 
-      <main id="main">
-        <section className="section models-hero">
+      <main id="main" className="models-page">
+        <header className="models-hero">
           <div className="wrap models-wrap">
+            <p className="models-kicker">Catalog</p>
             <h1 className="page-title">Models</h1>
             <p className="models-lede">
-              Pull from Hugging Face into local storage. Licenses are shown at{" "}
-              <code>wavhost pull</code> time. Engines install on demand.
+              Pull checkpoints from Hugging Face into local storage. Licenses
+              appear at <code>wavhost pull</code> time; engines install on
+              demand.
             </p>
+            <nav className="models-toc" aria-label="Model families">
+              <a href="#chatterbox-english">Chatterbox English</a>
+              <a href="#chatterbox-multilingual">Multilingual</a>
+              <a href="#qwen3-tts">Qwen3-TTS</a>
+            </nav>
           </div>
-        </section>
+        </header>
 
-        <section className="section">
-          <div className="wrap models-wrap models-stack">
-            <ModelFamily
-              title="Chatterbox · English"
-              badges={
-                <>
-                  <Badge variant="secondary">MIT</Badge>
-                  <Badge variant="outline">Resemble AI</Badge>
-                </>
-              }
-              description="English TTS with built-in stock voice and reference-audio cloning."
-              languages={CHATTERBOX_EN_LANGUAGES}
-              models={CHATTERBOX_EN}
-            />
+        <div className="wrap models-wrap models-stack">
+          <ModelFamily
+            id="chatterbox-english"
+            eyebrow="Resemble AI"
+            title="Chatterbox English"
+            tags={["MIT", "English"]}
+            description="Stock voice plus reference-audio cloning. Turbo is the usual default."
+            languages={CHATTERBOX_EN_LANGUAGES}
+            models={CHATTERBOX_EN}
+          />
 
-            <ModelFamily
-              title="Chatterbox · Multilingual"
-              badges={
-                <>
-                  <Badge variant="secondary">MIT</Badge>
-                  <Badge variant="outline">23 languages</Badge>
-                </>
-              }
-              description={
-                <>
-                  Same engine family with multilingual weights. Pass an ISO
-                  language code via <code>--language</code> / API{" "}
-                  <code>language</code> (default <code>en</code>). Optional{" "}
-                  <code>--voice</code> for cloning.
-                </>
-              }
-              languages={CHATTERBOX_MTL_LANGUAGES}
-              models={CHATTERBOX_MTL}
-              footer={
-                <div className="model-example">
-                  <span className="model-example-label">Example</span>
-                  <div className="model-pull">
-                    <code data-copy>
-                      wavhost run chatterbox-multilingual &quot;Bonjour&quot; -l
-                      fr
-                    </code>
-                    <CopyButton
-                      text='wavhost run chatterbox-multilingual "Bonjour" -l fr'
-                      className="copy-btn copy-btn--chip"
-                      label="Copy multilingual run"
-                    />
-                  </div>
+          <ModelFamily
+            id="chatterbox-multilingual"
+            eyebrow="Resemble AI"
+            title="Chatterbox Multilingual"
+            tags={["MIT", "23 languages"]}
+            description={
+              <>
+                Same family with multilingual weights. Pass an ISO code with{" "}
+                <code>--language</code> / API <code>language</code> (default{" "}
+                <code>en</code>). Optional <code>--voice</code> for cloning.
+              </>
+            }
+            languages={CHATTERBOX_MTL_LANGUAGES}
+            models={CHATTERBOX_MTL}
+            aside={
+              <div className="model-aside-row">
+                <span className="model-aside-label">Try</span>
+                <CommandChip
+                  text='wavhost run chatterbox-multilingual "Bonjour" -l fr'
+                  label="Copy multilingual run"
+                />
+              </div>
+            }
+          />
+
+          <ModelFamily
+            id="qwen3-tts"
+            eyebrow="Alibaba"
+            title="Qwen3-TTS"
+            tags={["Apache-2.0", "10 languages"]}
+            description="CustomVoice (named speakers) and Base (clone from audio) stay as separate pulls."
+            languages={QWEN_LANGUAGES}
+            models={QWEN}
+            aside={
+              <>
+                <div className="model-note">
+                  <p>
+                    <strong>CustomVoice</strong> — nine speakers (
+                    <code>Ryan</code>, <code>Aiden</code>, <code>Vivian</code>,{" "}
+                    <code>Serena</code>, <code>Uncle_Fu</code>,{" "}
+                    <code>Dylan</code>, <code>Eric</code>,{" "}
+                    <code>Ono_Anna</code>, <code>Sohee</code>). Default Ryan.
+                    Native-language speakers sound best; cross-lingual still
+                    works.
+                  </p>
+                  <p>
+                    <strong>Base</strong> — clone with <code>--voice</code>{" "}
+                    (saved voice or audio file) in any supported language.
+                  </p>
                 </div>
-              }
-            />
+                <div className="model-aside-row">
+                  <span className="model-aside-label">Try</span>
+                  <CommandChip
+                    text='wavhost run qwen-0.6-customvoice "Hello" --voice Ryan'
+                    label="Copy Qwen CustomVoice run"
+                  />
+                </div>
+              </>
+            }
+          />
 
-            <ModelFamily
-              title="Qwen3-TTS"
-              badges={
-                <>
-                  <Badge variant="secondary">Apache-2.0</Badge>
-                  <Badge variant="outline">Alibaba</Badge>
-                </>
-              }
-              description="Ten languages across CustomVoice and Base. Pulls stay separate — pick the checkpoint that matches your workflow."
-              languages={QWEN_LANGUAGES}
-              models={QWEN}
-              footer={
-                <>
-                  <Alert>
-                    <AlertTitle>CustomVoice vs Base</AlertTitle>
-                    <AlertDescription>
-                      <strong>CustomVoice</strong> uses nine named speakers (
-                      <code>Ryan</code>, <code>Aiden</code>, <code>Vivian</code>
-                      , <code>Serena</code>, <code>Uncle_Fu</code>,{" "}
-                      <code>Dylan</code>, <code>Eric</code>,{" "}
-                      <code>Ono_Anna</code>, <code>Sohee</code>). Default is
-                      Ryan. Speakers have native languages (e.g. Ryan/Aiden
-                      English; Vivian Chinese; Ono_Anna Japanese; Sohee Korean;
-                      Dylan Beijing; Eric Sichuan) — cross-lingual still works,
-                      native is best quality.
-                      <br />
-                      <strong>Base</strong> clones from <code>--voice</code>{" "}
-                      (saved voice or audio file) in any of the ten languages.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="model-example">
-                    <span className="model-example-label">Example</span>
-                    <div className="model-pull">
-                      <code data-copy>
-                        wavhost run qwen-0.6-customvoice &quot;Hello&quot;
-                        --voice Ryan
-                      </code>
-                      <CopyButton
-                        text='wavhost run qwen-0.6-customvoice "Hello" --voice Ryan'
-                        className="copy-btn copy-btn--chip"
-                        label="Copy Qwen CustomVoice run"
-                      />
-                    </div>
-                  </div>
-                </>
-              }
-            />
-
-            <Separator />
-
-            <p className="models-footer-note">
-              Full CLI and API details:{" "}
-              <Link href="/docs" className="underline underline-offset-2">
-                Docs
-              </Link>
-              .
-            </p>
-          </div>
-        </section>
+          <p className="models-footer-note">
+            CLI and API reference in the{" "}
+            <Link href="/docs">docs</Link>.
+          </p>
+        </div>
       </main>
 
       <Footer />
