@@ -176,6 +176,7 @@ class ChatterboxBackend:
                 self._model = ChatterboxTurboTTS.from_local(
                     self._checkpoint_path,
                     self._device,
+                    **self._model_kwargs
                 )
             else:
                 from chatterbox.tts import ChatterboxTTS

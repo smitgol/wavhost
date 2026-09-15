@@ -11,8 +11,9 @@ def test_registry_list_models():
     registry = ModelRegistry()
     models = registry.list_models()
     
-    assert len(models) >= 4
+    assert len(models) >= 5
     assert "chatterbox-turbo" in models
+    assert "chatterbox-nano" in models
     assert "chatterbox-base" in models
     assert "qwen-0.6b" in models
     assert "qwen-1.7b" in models
@@ -106,8 +107,9 @@ def test_get_all_models():
     
     all_models = registry.get_all_models()
     assert isinstance(all_models, dict)
-    assert len(all_models) >= 4
+    assert len(all_models) >= 5
     assert "chatterbox-turbo" in all_models
+    assert "chatterbox-nano" in all_models
     assert "qwen-0.6b" in all_models
 
 
@@ -129,3 +131,18 @@ def test_qwen_models_info():
     assert qwen_17b.name == "qwen-1.7b"
     assert qwen_17b.backend == "qwen"
     assert qwen_17b.vram_requirement == "~5GB"
+
+
+def test_chatterbox_nano_model_info():
+    """Test Chatterbox Nano model information."""
+    registry = ModelRegistry()
+    
+    nano = registry.get_model_info("chatterbox-nano")
+    assert nano.name == "chatterbox-nano"
+    assert nano.backend == "chatterbox"
+    assert nano.license == "MIT"
+    assert nano.namespace == "resemble"
+    assert nano.model_class == "ChatterboxTurboTTS"
+    assert nano.model_kwargs == {"nano": True}
+    assert nano.recommended_device == "cpu"
+    assert nano.vram_requirement == "~1GB"
