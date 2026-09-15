@@ -10,12 +10,14 @@ Wavhost is a local text-to-speech (TTS) runtime that brings high-quality voice s
 
 ## Features
 
-- 🚀 **Local-first**: All processing happens on your machine
+- 🚀 **Local-first**: All processing happens on your machine—no API keys, no cloud calls, complete privacy
 - 🔌 **OpenAI-compatible API**: Drop-in replacement for OpenAI's `/v1/audio/speech` endpoint
-- 📦 **Ollama-style storage**: Content-addressed model storage with deduplication
-- 🎯 **Simple CLI**: Pull, run, and serve models with ease
+- 🎤 **Voice library**: Create, save, and manage unlimited custom voices from reference audio
+- 📦 **Ollama-style storage**: Content-addressed storage with SHA-256 deduplication
+- 🎯 **Simple CLI & API**: Full CLI commands and RESTful HTTP API for voice management
 - 🔓 **Open source**: MIT/Apache-2.0 licensed runtime, using open TTS models
 - ⚡ **GPU accelerated**: Optimized for NVIDIA GPUs (CPU fallback available)
+- 🔒 **Privacy-focused**: Your voices and audio never leave your machine
 
 ## Quick Start
 
@@ -58,6 +60,21 @@ wavhost pull chatterbox-turbo --skip-deps
 wavhost run chatterbox-turbo "Hello world, this is Wavhost!" -o output.wav
 ```
 
+### Manage Voices
+
+Create and save custom voices from reference audio:
+
+```bash
+# Create a voice from reference audio
+wavhost voice create my-voice --ref reference.wav --desc "My custom voice"
+
+# List saved voices
+wavhost voice list
+
+# Use a saved voice
+wavhost run chatterbox-turbo "Hello from my voice!" --voice my-voice -o output.wav
+```
+
 ### Start the Server
 
 ```bash
@@ -74,9 +91,55 @@ curl http://127.0.0.1:11435/v1/audio/speech \
   -d '{
     "model": "chatterbox-turbo",
     "input": "Hello from Wavhost!",
-    "voice": "default"
+    "voice": "my-voice"
   }' \
   --output speech.mp3
+```
+
+Use `"voice": "default"` for the built-in voice, or specify a saved voice name.
+
+## Complete Workflow Example
+
+Here's a complete example showing the full voice management workflow:
+
+```bash
+# 1. Install Wavhost
+pip install wavhost
+
+# 2. Pull a TTS model
+wavhost pull chatterbox-turbo
+
+# 3. Create a custom voice from your audio
+wavhost voice create my-narrator --ref ~/audio/sample.wav --desc "My narrator voice"
+
+# 4. Generate speech using your custom voice (CLI)
+wavhost run chatterbox-turbo "Welcome to Wavhost!" --voice my-narrator -o welcome.wav
+
+# 5. Start the API server
+wavhost serve &
+
+# 6. Create voices via API
+curl -X POST http://localhost:11435/v1/voices \
+  -F "name=assistant" \
+  -F "file=@assistant-sample.wav" \
+  -F "description=AI assistant voice"
+
+# 7. List all voices
+curl http://localhost:11435/v1/voices
+
+# 8. Generate speech via API with custom voice
+curl http://localhost:11435/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "chatterbox-turbo",
+    "input": "Hello! This is my custom voice.",
+    "voice": "assistant",
+    "response_format": "mp3"
+  }' \
+  --output output.mp3
+
+# 9. Clean up - remove a voice when done
+wavhost voice rm my-narrator
 ```
 
 ## Available Models
@@ -109,12 +172,65 @@ Generate speech from text using a local model.
 
 **Options:**
 - `-o, --output PATH`: Output WAV file path (default: `output.wav`)
-- `--voice PATH`: Reference voice audio for cloning (experimental)
+- `--voice NAME_OR_PATH`: Saved voice name from local library, or path to reference audio
 - `--device DEVICE`: Device to use (`cuda`, `cpu`, or `mps`)
 
 **Example:**
 ```bash
 wavhost run chatterbox-turbo "Welcome to Wavhost" -o welcome.wav
+
+# Use a saved voice
+wavhost run chatterbox-turbo "Hello" --voice my-voice -o hello.wav
+
+# Use reference audio directly
+wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
+```
+
+### `wavhost voice`
+
+Manage local voice library.
+
+#### `wavhost voice create <name> --ref <audio>`
+
+Create and save a voice from reference audio.
+
+**Options:**
+- `--ref PATH` (required): Path to reference audio file
+- `--desc TEXT`: Voice description
+
+**Example:**
+```bash
+wavhost voice create narrator --ref voice.wav --desc "Professional narrator voice"
+```
+
+#### `wavhost voice list`
+
+List all saved voices.
+
+**Example:**
+```bash
+wavhost voice list
+```
+
+#### `wavhost voice show <name>`
+
+Show details about a saved voice.
+
+**Example:**
+```bash
+wavhost voice show narrator
+```
+
+#### `wavhost voice rm <name>`
+
+Remove a saved voice.
+
+**Options:**
+- `-y, --yes`: Skip confirmation prompt
+
+**Example:**
+```bash
+wavhost voice rm narrator
 ```
 
 ### `wavhost serve`
@@ -169,6 +285,105 @@ pip uninstall wavhost
 
 ## API Reference
 
+### Voice Management
+
+#### `POST /v1/voices`
+
+Create a new voice from reference audio.
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Parameters:
+  - `name` (string, required): Voice name
+  - `file` (file, required): Reference audio file
+  - `description` (string, optional): Voice description
+
+**Example:**
+```bash
+curl -X POST http://localhost:11435/v1/voices \
+  -F "name=narrator" \
+  -F "file=@reference.wav" \
+  -F "description=Professional narrator voice"
+```
+
+**Response:**
+```json
+{
+  "name": "narrator",
+  "message": "Voice 'narrator' created successfully"
+}
+```
+
+#### `GET /v1/voices`
+
+List all saved voices.
+
+**Example:**
+```bash
+curl http://localhost:11435/v1/voices
+```
+
+**Response:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "name": "narrator",
+      "description": "Professional narrator voice",
+      "backend": "chatterbox",
+      "ref_audio": {
+        "digest": "sha256-...",
+        "original_filename": "reference.wav",
+        "size": 1024000
+      }
+    }
+  ]
+}
+```
+
+#### `GET /v1/voices/{name}`
+
+Get details about a specific voice.
+
+**Example:**
+```bash
+curl http://localhost:11435/v1/voices/narrator
+```
+
+**Response:**
+```json
+{
+  "name": "narrator",
+  "description": "Professional narrator voice",
+  "backend": "chatterbox",
+  "ref_audio": {
+    "digest": "sha256-...",
+    "original_filename": "reference.wav",
+    "size": 1024000
+  }
+}
+```
+
+#### `DELETE /v1/voices/{name}`
+
+Delete a saved voice.
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:11435/v1/voices/narrator
+```
+
+**Response:**
+```json
+{
+  "name": "narrator",
+  "deleted": true
+}
+```
+
+### Speech Generation
+
 ### `POST /v1/audio/speech`
 
 Generate speech from text (OpenAI-compatible).
@@ -187,7 +402,7 @@ Generate speech from text (OpenAI-compatible).
 **Parameters:**
 - `model` (string, required): Model to use
 - `input` (string, required): Text to synthesize (max 4096 chars)
-- `voice` (string, optional): Voice identifier (default: "default")
+- `voice` (string, optional): Voice name from local library, or `"default"` for built-in voice
 - `response_format` (string, optional): Audio format. Defaults to `mp3`.
   - Encoded: `mp3`, `wav`, `opus`, `flac`, `aac`
   - Raw PCM (signed 16-bit little-endian): `pcm` (model native rate), `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`
@@ -195,6 +410,11 @@ Generate speech from text (OpenAI-compatible).
 
 **Response:**
 Binary audio file in the requested format.
+
+**Error Responses:**
+- `400 Bad Request`: Unknown voice or invalid parameters
+- `404 Not Found`: Model not found
+- `500 Internal Server Error`: Generation failed
 
 ### `GET /v1/models`
 
@@ -228,6 +448,92 @@ Health check endpoint.
 }
 ```
 
+## Integration Examples
+
+### Python
+
+```python
+import requests
+
+# Create a voice
+with open("reference.wav", "rb") as f:
+    response = requests.post(
+        "http://localhost:11435/v1/voices",
+        data={"name": "my-voice", "description": "Custom voice"},
+        files={"file": f}
+    )
+print(response.json())
+
+# Generate speech with custom voice
+response = requests.post(
+    "http://localhost:11435/v1/audio/speech",
+    json={
+        "model": "chatterbox-turbo",
+        "input": "Hello world!",
+        "voice": "my-voice",
+        "response_format": "mp3"
+    }
+)
+
+with open("output.mp3", "wb") as f:
+    f.write(response.content)
+```
+
+### JavaScript (Node.js)
+
+```javascript
+const FormData = require('form-data');
+const fs = require('fs');
+const axios = require('axios');
+
+// Create a voice
+const form = new FormData();
+form.append('name', 'my-voice');
+form.append('description', 'Custom voice');
+form.append('file', fs.createReadStream('reference.wav'));
+
+await axios.post('http://localhost:11435/v1/voices', form, {
+  headers: form.getHeaders()
+});
+
+// Generate speech
+const response = await axios.post(
+  'http://localhost:11435/v1/audio/speech',
+  {
+    model: 'chatterbox-turbo',
+    input: 'Hello world!',
+    voice: 'my-voice',
+    response_format: 'mp3'
+  },
+  { responseType: 'arraybuffer' }
+);
+
+fs.writeFileSync('output.mp3', Buffer.from(response.data));
+```
+
+### cURL
+
+```bash
+# Complete workflow
+# 1. Create voice
+curl -X POST http://localhost:11435/v1/voices \
+  -F "name=narrator" \
+  -F "file=@voice.wav" \
+  -F "description=Narrator voice"
+
+# 2. Generate speech
+curl http://localhost:11435/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatterbox-turbo","input":"Hello!","voice":"narrator"}' \
+  --output speech.mp3
+
+# 3. List voices
+curl http://localhost:11435/v1/voices
+
+# 4. Delete voice
+curl -X DELETE http://localhost:11435/v1/voices/narrator
+```
+
 ## Architecture
 
 ### Storage
@@ -250,18 +556,30 @@ Wavhost uses Ollama-style content-addressed storage:
           latest/
             ve.safetensors
             ...
+  voices/
+    manifests/
+      <voice_name>.json
+    blobs/
+      sha256-<hash>
 ```
 
 - **Manifests**: Model metadata and layer digests
 - **Blobs**: Content-addressed file storage with SHA-256 deduplication
 - **Checkpoints**: Materialized directories (hardlinks/copies of blobs) loaded by `from_local`
+- **Voices**: Saved voice library with reference audio and metadata
 
 ### Backends
 
 The `TTSBackend` protocol enables pluggable TTS engines:
 
 - **Chatterbox**: MIT-licensed models by Resemble AI (currently implemented)
+- Supports voice creation and cloning from reference audio
 - Future backends can be added by implementing the `TTSBackend` protocol
+
+**Voice Handles:** Each backend implements voice creation differently:
+- Chatterbox stores reference audio paths for on-the-fly cloning
+- Future backends may use embeddings or other voice representations
+- The voice storage layer is backend-agnostic
 
 ## Hardware Requirements
 
@@ -274,6 +592,55 @@ The `TTSBackend` protocol enables pluggable TTS engines:
 - Modern CPU with 8+ cores
 - 8GB+ system RAM
 - Generation falls back to CPU automatically, but runs considerably slower than real-time
+
+### Storage
+- ~2GB per TTS model (varies by model)
+- Voice audio files (typically a few MB per voice)
+- Total: Plan for 5-10GB for comfortable usage
+
+## FAQ
+
+### General
+
+**Q: Is my data sent to any cloud service?**  
+A: No. Everything runs locally. Models, voices, and generated audio never leave your machine.
+
+**Q: Can I use this commercially?**  
+A: Yes. Wavhost runtime is Apache-2.0. Each model has its own license—Chatterbox models are MIT.
+
+**Q: How does voice cloning work?**  
+A: Provide 3-10 seconds of clean reference audio. The model clones the voice characteristics for new text.
+
+**Q: What audio formats are supported for reference audio?**  
+A: Common formats like WAV, MP3, FLAC work. Best results with WAV files at 16kHz or higher.
+
+### Voice Management
+
+**Q: How many voices can I create?**  
+A: Unlimited. Each voice uses minimal storage (just the reference audio, deduplicated).
+
+**Q: Can I share voices with others?**  
+A: Currently, voices are stored locally. Voice export/import is planned for future releases.
+
+**Q: What makes a good reference audio sample?**  
+A: Clear speech, minimal background noise, 3-10 seconds, natural speaking pace.
+
+**Q: Can I update a voice after creating it?**  
+A: Delete the old voice and create a new one with the same name using updated audio.
+
+### API & Development
+
+**Q: Is this compatible with OpenAI's API?**  
+A: Yes. The `/v1/audio/speech` endpoint matches OpenAI's specification. Just change the base URL.
+
+**Q: Can I run multiple instances?**  
+A: Yes. Run on different ports or machines. Each instance has its own voice library.
+
+**Q: What about rate limiting?**  
+A: No rate limits. You control the hardware and throughput.
+
+**Q: Can I use this in Docker?**  
+A: Yes. Mount `~/.wavhost` as a volume to persist models and voices across containers.
 
 ## Development
 
@@ -309,13 +676,33 @@ mypy wavhost
 - ✅ Chatterbox backend
 - ✅ CLI (pull, run, serve)
 - ✅ OpenAI-compatible API
+- ✅ Local voice library (create, save, manage via CLI and API)
 
 ### Future
 - Additional backends (Qwen3-TTS, etc.)
-- Voice cloning support
 - Streaming audio generation
 - Model quantization
 - Multi-language models
+
+## Use Cases
+
+### Content Creation
+- **Audiobooks**: Create consistent narrator voices for long-form content
+- **Podcasts**: Generate intro/outro segments with custom voices
+- **Videos**: Add voiceovers with different character voices
+- **Marketing**: Produce audio ads with brand-specific voices
+
+### Development
+- **Voice Assistants**: Build local voice assistants with custom personalities
+- **Accessibility**: Add text-to-speech to applications without API dependencies
+- **Games**: Create character voices without royalty fees
+- **Prototyping**: Test voice UX without cloud service costs
+
+### Business
+- **Call Centers**: Generate hold messages and IVR prompts
+- **E-learning**: Create course narration with consistent voices
+- **Documentation**: Convert docs to audio with professional narration
+- **Customer Support**: Build voice bots that run on-premise
 
 ## License
 
