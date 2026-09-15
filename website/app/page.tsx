@@ -163,7 +163,7 @@ export default function Home() {
             </div>
             <p className="hint hint-left">
               Voice CRUD: <code>POST/GET/DELETE /v1/voices</code> — see{" "}
-              <Link href="/docs#api-voices">Docs</Link>.
+              <Link href="/docs/api#voices">Docs</Link>.
             </p>
           </div>
         </section>
