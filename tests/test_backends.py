@@ -256,6 +256,69 @@ def test_generate_without_voice_passes_no_prompt(monkeypatch, checkpoint):
     assert backend._model.generate_kwargs == {}
 
 
+def test_generate_with_voice_handle(monkeypatch, checkpoint, tmp_path):
+    """Voice handle with ref_audio_path is used for generation."""
+    voice_file = tmp_path / "voice.wav"
+    voice_file.write_bytes(b"")
+    
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    voice_handle = {"ref_audio_path": str(voice_file)}
+    backend.generate("Hello world", voice_handle=voice_handle)
+    
+    assert backend._model.generate_kwargs == {"audio_prompt_path": str(voice_file)}
+
+
+def test_generate_voice_handle_overrides_voice_param(monkeypatch, checkpoint, tmp_path):
+    """Voice handle takes precedence over voice parameter."""
+    voice_file = tmp_path / "voice.wav"
+    other_file = tmp_path / "other.wav"
+    voice_file.write_bytes(b"")
+    other_file.write_bytes(b"")
+    
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    voice_handle = {"ref_audio_path": str(voice_file)}
+    backend.generate("Hello world", voice=str(other_file), voice_handle=voice_handle)
+    
+    # Should use voice_handle, not voice
+    assert backend._model.generate_kwargs == {"audio_prompt_path": str(voice_file)}
+
+
+def test_generate_invalid_voice_handle_raises_error(monkeypatch, checkpoint):
+    """Invalid voice handle raises clear error."""
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    
+    with pytest.raises(BackendError, match="Invalid voice handle"):
+        backend.generate("Hello world", voice_handle={"invalid": "data"})
+
+
+def test_generate_voice_handle_missing_file_raises_error(monkeypatch, checkpoint, tmp_path):
+    """Voice handle with missing file raises error."""
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    voice_handle = {"ref_audio_path": str(tmp_path / "missing.wav")}
+    
+    with pytest.raises(BackendError, match="Voice reference audio not found"):
+        backend.generate("Hello world", voice_handle=voice_handle)
+
+
+def test_create_voice_returns_handle(monkeypatch, checkpoint, tmp_path):
+    """create_voice returns a voice handle dict."""
+    voice_file = tmp_path / "voice.wav"
+    voice_file.write_bytes(b"")
+    
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    handle = backend.create_voice(str(voice_file))
+    
+    assert handle == {"ref_audio_path": str(voice_file)}
+
+
+def test_create_voice_missing_file_raises_error(monkeypatch, checkpoint, tmp_path):
+    """create_voice with missing file raises error."""
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    
+    with pytest.raises(BackendError, match="Reference audio not found"):
+        backend.create_voice(str(tmp_path / "missing.wav"))
+
+
 def test_generate_rejects_missing_voice_file(monkeypatch, checkpoint):
     """A reference voice that isn't on disk fails loudly rather than silently."""
     backend = _backend_with_fake_model(monkeypatch, checkpoint)
