@@ -240,6 +240,105 @@ pip uninstall wavhost
 
 ## API Reference
 
+### Voice Management
+
+#### `POST /v1/voices`
+
+Create a new voice from reference audio.
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Parameters:
+  - `name` (string, required): Voice name
+  - `file` (file, required): Reference audio file
+  - `description` (string, optional): Voice description
+
+**Example:**
+```bash
+curl -X POST http://localhost:11435/v1/voices \
+  -F "name=narrator" \
+  -F "file=@reference.wav" \
+  -F "description=Professional narrator voice"
+```
+
+**Response:**
+```json
+{
+  "name": "narrator",
+  "message": "Voice 'narrator' created successfully"
+}
+```
+
+#### `GET /v1/voices`
+
+List all saved voices.
+
+**Example:**
+```bash
+curl http://localhost:11435/v1/voices
+```
+
+**Response:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "name": "narrator",
+      "description": "Professional narrator voice",
+      "backend": "chatterbox",
+      "ref_audio": {
+        "digest": "sha256-...",
+        "original_filename": "reference.wav",
+        "size": 1024000
+      }
+    }
+  ]
+}
+```
+
+#### `GET /v1/voices/{name}`
+
+Get details about a specific voice.
+
+**Example:**
+```bash
+curl http://localhost:11435/v1/voices/narrator
+```
+
+**Response:**
+```json
+{
+  "name": "narrator",
+  "description": "Professional narrator voice",
+  "backend": "chatterbox",
+  "ref_audio": {
+    "digest": "sha256-...",
+    "original_filename": "reference.wav",
+    "size": 1024000
+  }
+}
+```
+
+#### `DELETE /v1/voices/{name}`
+
+Delete a saved voice.
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:11435/v1/voices/narrator
+```
+
+**Response:**
+```json
+{
+  "name": "narrator",
+  "deleted": true
+}
+```
+
+### Speech Generation
+
 ### `POST /v1/audio/speech`
 
 Generate speech from text (OpenAI-compatible).

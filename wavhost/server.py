@@ -7,7 +7,7 @@ from typing import Literal
 
 import torch
 import torchaudio
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from wavhost.backends import create_backend
@@ -21,7 +21,7 @@ from wavhost.exceptions import (
 from wavhost.logging_config import get_logger
 from wavhost.registry import ModelRegistry
 from wavhost.storage import WavhostStorage
-from wavhost.voices import VoiceStorage, VoiceNotFoundError
+from wavhost.voices import VoiceStorage, VoiceNotFoundError, VoiceAlreadyExistsError, VoiceError
 
 logger = get_logger(__name__)
 
@@ -413,6 +413,212 @@ async def create_speech(request: SpeechRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error generating speech: {str(e)}"
+        )
+
+
+# Voice management endpoints
+
+class VoiceInfo(BaseModel):
+    """Voice information model."""
+    
+    name: str
+    description: str = ""
+    backend: str
+    ref_audio: dict
+
+
+class VoiceListResponse(BaseModel):
+    """Response model for voice list endpoint."""
+    
+    object: Literal["list"] = "list"
+    data: list[VoiceInfo]
+
+
+class VoiceCreateResponse(BaseModel):
+    """Response model for voice creation."""
+    
+    name: str
+    message: str
+
+
+class VoiceDeleteResponse(BaseModel):
+    """Response model for voice deletion."""
+    
+    name: str
+    deleted: bool
+
+
+@app.post("/v1/voices", response_model=VoiceCreateResponse, tags=["Voices"])
+async def create_voice(
+    name: str = Form(...),
+    file: UploadFile = File(...),
+    description: str = Form(""),
+):
+    """Create a new voice from reference audio.
+    
+    Upload reference audio to create a saved voice that can be used
+    in speech generation requests.
+    
+    Example:
+        curl -X POST http://localhost:11435/v1/voices \\
+          -F "name=my-voice" \\
+          -F "file=@reference.wav" \\
+          -F "description=My custom voice"
+    """
+    try:
+        voice_storage = VoiceStorage()
+        
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            tmp_path = Path(tmp.name)
+            content = await file.read()
+            tmp.write(content)
+        
+        try:
+            # Create voice from uploaded file
+            voice_storage.create_voice(
+                name=name,
+                ref_audio_path=tmp_path,
+                description=description,
+            )
+            
+            logger.info(f"Created voice via API: {name}")
+            
+            return VoiceCreateResponse(
+                name=name,
+                message=f"Voice '{name}' created successfully"
+            )
+            
+        finally:
+            # Clean up temporary file
+            if tmp_path.exists():
+                tmp_path.unlink()
+        
+    except VoiceAlreadyExistsError as e:
+        logger.warning(f"Voice creation failed: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Voice '{name}' already exists. Use a different name or delete the existing voice first."
+        )
+    except VoiceError as e:
+        logger.error(f"Voice creation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error creating voice")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating voice: {str(e)}"
+        )
+
+
+@app.get("/v1/voices", response_model=VoiceListResponse, tags=["Voices"])
+async def list_voices():
+    """List all saved voices.
+    
+    Returns a list of all voices in the local voice library.
+    
+    Example:
+        curl http://localhost:11435/v1/voices
+    """
+    try:
+        voice_storage = VoiceStorage()
+        voices = voice_storage.list_voices()
+        
+        voice_data = [
+            VoiceInfo(
+                name=v["name"],
+                description=v.get("description", ""),
+                backend=v.get("backend", ""),
+                ref_audio=v.get("ref_audio", {})
+            )
+            for v in voices
+        ]
+        
+        return VoiceListResponse(data=voice_data)
+        
+    except Exception as e:
+        logger.exception("Error listing voices")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing voices: {str(e)}"
+        )
+
+
+@app.get("/v1/voices/{name}", response_model=VoiceInfo, tags=["Voices"])
+async def get_voice(name: str):
+    """Get details about a specific voice.
+    
+    Returns information about a saved voice including its metadata
+    and reference audio details.
+    
+    Example:
+        curl http://localhost:11435/v1/voices/my-voice
+    """
+    try:
+        voice_storage = VoiceStorage()
+        manifest = voice_storage.get_voice(name)
+        
+        return VoiceInfo(
+            name=manifest["name"],
+            description=manifest.get("description", ""),
+            backend=manifest.get("backend", ""),
+            ref_audio=manifest.get("ref_audio", {})
+        )
+        
+    except VoiceNotFoundError as e:
+        logger.warning(f"Voice not found: {name}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Voice '{name}' not found. Use GET /v1/voices to see available voices."
+        )
+    except Exception as e:
+        logger.exception("Error getting voice")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting voice: {str(e)}"
+        )
+
+
+@app.delete("/v1/voices/{name}", response_model=VoiceDeleteResponse, tags=["Voices"])
+async def delete_voice(name: str):
+    """Delete a saved voice.
+    
+    Removes a voice from the local library and cleans up unused
+    reference audio blobs.
+    
+    Example:
+        curl -X DELETE http://localhost:11435/v1/voices/my-voice
+    """
+    try:
+        voice_storage = VoiceStorage()
+        
+        if not voice_storage.voice_exists(name):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Voice '{name}' not found"
+            )
+        
+        deleted = voice_storage.delete_voice(name)
+        
+        if deleted:
+            logger.info(f"Deleted voice via API: {name}")
+            return VoiceDeleteResponse(name=name, deleted=True)
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Voice '{name}' not found"
+            )
+        
+    except VoiceError as e:
+        logger.error(f"Voice deletion error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error deleting voice")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting voice: {str(e)}"
         )
 
 
