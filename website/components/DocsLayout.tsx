@@ -9,39 +9,53 @@ interface DocsLayoutProps {
 
 export function DocsLayout({ children, breadcrumb, currentPath, toc }: DocsLayoutProps) {
   return (
-    <div className="docs-shell">
-      <aside className="docs-side" aria-label="Documentation">
-        <p className="docs-side-label">Guides</p>
-        <ul className="docs-side-list">
-          <li>
-            <Link href="/docs" aria-current={currentPath === "/docs" ? "page" : undefined}>
-              Getting started
-            </Link>
-          </li>
-        </ul>
-        <p className="docs-side-label">Reference</p>
-        <ul className="docs-side-list">
-          <li>
-            <Link href="/docs/cli" aria-current={currentPath === "/docs/cli" ? "page" : undefined}>
-              CLI
-            </Link>
-          </li>
-          <li>
-            <Link href="/docs/api" aria-current={currentPath === "/docs/api" ? "page" : undefined}>
-              API
-            </Link>
-          </li>
-        </ul>
-        <p className="docs-side-label">Site</p>
-        <ul className="docs-side-list">
-          <li>
-            <Link href="/">Home</Link>
-          </li>
-          <li>
-            <Link href="/models">Models</Link>
-          </li>
-        </ul>
-      </aside>
+    <>
+      <div className="docs-mobile-nav">
+        <nav aria-label="Documentation">
+          <Link href="/docs" aria-current={currentPath === "/docs" ? "page" : undefined}>
+            Overview
+          </Link>
+          <Link href="/docs/cli" aria-current={currentPath === "/docs/cli" ? "page" : undefined}>
+            CLI
+          </Link>
+          <Link href="/docs/api" aria-current={currentPath === "/docs/api" ? "page" : undefined}>
+            API
+          </Link>
+        </nav>
+      </div>
+      <div className="docs-shell">
+        <aside className="docs-side" aria-label="Documentation">
+          <p className="docs-side-label">Guides</p>
+          <ul className="docs-side-list">
+            <li>
+              <Link href="/docs" aria-current={currentPath === "/docs" ? "page" : undefined}>
+                Getting started
+              </Link>
+            </li>
+          </ul>
+          <p className="docs-side-label">Reference</p>
+          <ul className="docs-side-list">
+            <li>
+              <Link href="/docs/cli" aria-current={currentPath === "/docs/cli" ? "page" : undefined}>
+                CLI
+              </Link>
+            </li>
+            <li>
+              <Link href="/docs/api" aria-current={currentPath === "/docs/api" ? "page" : undefined}>
+                API
+              </Link>
+            </li>
+          </ul>
+          <p className="docs-side-label">Site</p>
+          <ul className="docs-side-list">
+            <li>
+              <Link href="/">Home</Link>
+            </li>
+            <li>
+              <Link href="/models">Models</Link>
+            </li>
+          </ul>
+        </aside>
 
       <div className="docs-main-col">
         <main id="main" className="docs-article">
@@ -66,6 +80,7 @@ export function DocsLayout({ children, breadcrumb, currentPath, toc }: DocsLayou
           </aside>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
