@@ -60,7 +60,6 @@ Thumbs.db
 # Test outputs
 output.wav
 speech.mp3
-test-*.wav
 *.wav
 *.mp3
 

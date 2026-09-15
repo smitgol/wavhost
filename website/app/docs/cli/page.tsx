@@ -40,7 +40,9 @@ export default function CLIPage() {
         <div className="code-wrap">
           <CopyButton
             text={`wavhost pull chatterbox-turbo
-wavhost pull chatterbox-base --force
+wavhost pull chatterbox-multilingual
+wavhost pull qwen-0.6-customvoice
+wavhost pull qwen-0.6-base --force
 wavhost pull chatterbox-turbo --skip-deps`}
             className="copy-btn copy-btn--block"
             label="Copy pull"
@@ -48,7 +50,9 @@ wavhost pull chatterbox-turbo --skip-deps`}
           <pre className="code">
             <code data-copy>
               {`wavhost pull chatterbox-turbo
-wavhost pull chatterbox-base --force
+wavhost pull chatterbox-multilingual
+wavhost pull qwen-0.6-customvoice
+wavhost pull qwen-0.6-base --force
 wavhost pull chatterbox-turbo --skip-deps`}
             </code>
           </pre>
@@ -84,7 +88,10 @@ wavhost pull chatterbox-turbo --skip-deps`}
           <CopyButton
             text={`wavhost run chatterbox-turbo "Welcome to Wavhost" -o welcome.wav
 wavhost run chatterbox-turbo "Hello" --voice my-voice -o hello.wav
-wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav`}
+wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
+wavhost run qwen-0.6-customvoice "Hello" --voice Ryan -o qwen.wav
+wavhost run qwen-0.6-base "Hello" --voice /path/to/audio.wav -o clone.wav
+wavhost run chatterbox-multilingual "Bonjour" --language fr -o fr.wav`}
             className="copy-btn copy-btn--block"
             label="Copy run"
           />
@@ -92,7 +99,10 @@ wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav`}
             <code data-copy>
               {`wavhost run chatterbox-turbo "Welcome to Wavhost" -o welcome.wav
 wavhost run chatterbox-turbo "Hello" --voice my-voice -o hello.wav
-wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav`}
+wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
+wavhost run qwen-0.6-customvoice "Hello" --voice Ryan -o qwen.wav
+wavhost run qwen-0.6-base "Hello" --voice /path/to/audio.wav -o clone.wav
+wavhost run chatterbox-multilingual "Bonjour" --language fr -o fr.wav`}
             </code>
           </pre>
         </div>
@@ -116,7 +126,19 @@ wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav`}
               <td>
                 <code>--voice</code>
               </td>
-              <td>Saved voice name, or path to reference audio</td>
+              <td>
+                Saved voice, reference audio path, or Qwen CustomVoice speaker (
+                <code>Ryan</code>, <code>Aiden</code>, …)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <code>--language, -l</code>
+              </td>
+              <td>
+                Language for Multilingual (ISO: <code>en</code>, <code>fr</code>,{" "}
+                <code>zh</code>, …) or Qwen names (<code>English</code>, …)
+              </td>
             </tr>
             <tr>
               <td>
@@ -247,7 +269,9 @@ wavhost serve --host 0.0.0.0 --port 8000 --reload`}
             text={`wavhost list
 wavhost rm chatterbox-turbo -y
 wavhost uninstall
-pip uninstall wavhost`}
+pip uninstall wavhost
+# optional engines:
+# pip uninstall chatterbox-tts qwen-tts`}
             className="copy-btn copy-btn--block"
             label="Copy model commands"
           />
@@ -256,7 +280,9 @@ pip uninstall wavhost`}
               {`wavhost list
 wavhost rm chatterbox-turbo -y
 wavhost uninstall
-pip uninstall wavhost`}
+pip uninstall wavhost
+# optional engines:
+# pip uninstall chatterbox-tts qwen-tts`}
             </code>
           </pre>
         </div>

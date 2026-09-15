@@ -377,3 +377,27 @@ class VoiceStorage:
             if voice.get("ref_audio", {}).get("digest") == digest:
                 return True
         return False
+
+
+def resolve_voice(
+    voice: Optional[str],
+    voice_storage: VoiceStorage,
+) -> tuple[Optional[str], Optional[dict[str, str]]]:
+    """Map a CLI/API voice string to ``(voice_arg, voice_handle)``.
+
+    Order: saved library → existing file path → named speaker / opaque string.
+    ``None`` / ``\"default\"`` means model built-in.
+    """
+    if voice is None or voice.lower() in {"", "default"}:
+        return None, None
+
+    if voice_storage.voice_exists(voice):
+        return None, {
+            "ref_audio_path": str(voice_storage.get_voice_ref_audio_path(voice))
+        }
+
+    path = Path(voice)
+    if path.exists():
+        return str(path), None
+
+    return voice, None

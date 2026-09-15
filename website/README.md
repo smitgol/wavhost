@@ -42,9 +42,12 @@ The site will automatically deploy when changes are pushed to the configured bra
 
 ## Design
 
+- **shadcn/ui** (Radix + Tailwind v4) for buttons, tables, cards, badges, alerts
 - **Grayscale palette:** Paper white / warm charcoal, black/light ink, neutral grays
-- **Theme toggle:** Respects `prefers-color-scheme`, persists choice in localStorage
-- **Copy buttons:** Every code block and command has a copy-to-clipboard button
-- **Docs layout:** Three-column shell with left sidebar, article, and right TOC (Diátaxis-style)
+- **Theme toggle:** Respects `prefers-color-scheme`, persists in localStorage (`data-theme` + `.dark`)
+- **Copy buttons:** Every code block and command has a copy-to-clipboard control
+- **Docs layout:** Three-column shell with left sidebar, article, and right TOC
+
+Models documented: Chatterbox (MIT) and Qwen3-TTS CustomVoice / Base (Apache-2.0).
 
 All GitHub links point to `https://github.com/smitgol/wavhost`.

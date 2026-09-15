@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wavhost"
-version = "0.1.1"
+version = "0.2.0"
 description = "Local-first TTS runtime with OpenAI-compatible API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,9 +41,7 @@ dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.5.0",
-    "pydantic-settings>=2.1.0",
     "httpx>=0.26.0",
-    "pyyaml>=6.0",
     "tqdm>=4.66.0",
     "numpy>=1.24.0",
     "torch>=2.0.0",
@@ -59,6 +57,9 @@ chatterbox = [
     "chatterbox-tts>=0.1.0",
     # resemble-perth imports pkg_resources, removed in setuptools 82.0.0.
     "setuptools<82",
+]
+qwen = [
+    "qwen-tts>=0.1.0",
 ]
 dev = [
     "pytest>=7.4.0",

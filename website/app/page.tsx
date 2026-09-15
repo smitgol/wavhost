@@ -79,7 +79,8 @@ export default function Home() {
             </div>
 
             <p className="hint">
-              Models, voices, and cache live under <code>~/.wavhost</code>. GPU recommended.
+              Models (Chatterbox + Qwen3-TTS), voices, and cache live under{" "}
+              <code>~/.wavhost</code>. See <Link href="/models">Models</Link>. GPU recommended.
             </p>
           </div>
         </section>

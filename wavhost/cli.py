@@ -6,9 +6,9 @@ from typing import NoReturn, Optional
 
 import click
 import torch
-import torchaudio
 
 from wavhost import dependencies
+from wavhost.audio import save_wav
 from wavhost.backends import create_backend
 from wavhost.config import (
     DEFAULT_HOST,
@@ -25,7 +25,12 @@ from wavhost.exceptions import (
 from wavhost.logging_config import setup_logger
 from wavhost.registry import ModelRegistry
 from wavhost.storage import WavhostStorage
-from wavhost.voices import VoiceStorage, VoiceNotFoundError, VoiceAlreadyExistsError
+from wavhost.voices import (
+    VoiceAlreadyExistsError,
+    VoiceNotFoundError,
+    VoiceStorage,
+    resolve_voice,
+)
 
 logger = setup_logger(__name__)
 
@@ -47,18 +52,10 @@ def handle_error(error: Exception, exit_code: int = 1) -> NoReturn:
 
 
 def display_available_models(registry: ModelRegistry) -> None:
-    """Display available models in a formatted list.
-    
-    Args:
-        registry: Model registry instance
-    """
     click.echo("\nAvailable models:")
     for name in registry.list_models():
-        try:
-            info = registry.get_model_info(name)
-            click.echo(f"  {name:<20} - {info.description}")
-        except ModelNotFoundError:
-            continue
+        info = registry.get_model_info(name)
+        click.echo(f"  {name:<24} - {info.description}")
 
 
 @click.group()
@@ -201,14 +198,32 @@ def _pull_model(storage: WavhostStorage, model_info, *, force: bool = False) -> 
 @click.argument("model_name")
 @click.argument("text")
 @click.option("-o", "--output", type=click.Path(), help="Output WAV file path")
-@click.option("--voice", type=str, help="Voice name from local library, or path to reference audio")
+@click.option(
+    "--voice",
+    type=str,
+    help=(
+        "Saved voice name, reference audio path, or Qwen CustomVoice speaker "
+        "(Ryan, Aiden, Vivian, ...). Omit for the model default."
+    ),
+)
+@click.option(
+    "--language",
+    "-l",
+    type=str,
+    default=None,
+    help=(
+        "Language for synthesis. Chatterbox Multilingual: ISO code "
+        "(en, fr, zh, …). Qwen: English, Chinese, …"
+    ),
+)
 @click.option("--device", type=str, help="Device to use (cuda/cpu/mps)")
 def run(
     model_name: str,
     text: str,
     output: Optional[str],
     voice: Optional[str],
-    device: Optional[str]
+    language: Optional[str],
+    device: Optional[str],
 ) -> None:
     """Generate speech from text using a model.
     
@@ -218,58 +233,27 @@ def run(
         storage = WavhostStorage()
         registry = ModelRegistry()
         voice_storage = VoiceStorage()
-        
+
         model_info = registry.get_model_info(model_name)
-        
-        if not storage.manifest_exists(model_info.namespace, model_info.name, model_info.tag):
-            raise ModelNotInstalledError(model_name)
-        
-        manifest = storage.load_manifest(
-            model_info.namespace, model_info.name, model_info.tag
+        checkpoint = storage.ensure_checkpoint(model_info)
+        voice_arg, voice_handle = resolve_voice(voice, voice_storage)
+        if voice_handle:
+            click.echo(f"Using saved voice: {voice}")
+        elif voice_arg and not Path(voice_arg).exists():
+            click.echo(f"Using speaker: {voice_arg}")
+        if language:
+            click.echo(f"Language: {language}")
+
+        _generate_speech(
+            model_info,
+            text,
+            output,
+            voice_arg,
+            device,
+            checkpoint,
+            voice_handle,
+            language=language,
         )
-        if not manifest or not manifest.get("layers"):
-            raise ModelNotInstalledError(model_name)
-        
-        checkpoint = storage.get_checkpoint_path(
-            model_info.namespace, model_info.name, model_info.tag
-        )
-        if not storage.checkpoint_ready(
-            model_info.namespace,
-            model_info.name,
-            model_info.tag,
-            manifest["layers"],
-        ):
-            storage.materialize_checkpoint(
-                model_info.namespace,
-                model_info.name,
-                model_info.tag,
-                manifest["layers"],
-            )
-        
-        # Resolve voice parameter (name or path)
-        voice_handle = None
-        voice_path = None
-        if voice:
-            # Check if it's a saved voice name
-            if voice_storage.voice_exists(voice):
-                ref_audio_path = voice_storage.get_voice_ref_audio_path(voice)
-                voice_handle = {"ref_audio_path": str(ref_audio_path)}
-                click.echo(f"Using saved voice: {voice}")
-            else:
-                # Treat as a file path
-                voice_path_obj = Path(voice)
-                if voice_path_obj.exists():
-                    voice_path = voice
-                else:
-                    click.echo(
-                        f"Warning: Voice '{voice}' not found as saved voice or file path",
-                        err=True
-                    )
-        
-        _generate_speech(model_info, text, output, voice_path, device, checkpoint, voice_handle)
-        
-    except (ModelNotFoundError, ModelNotInstalledError, BackendError) as e:
-        handle_error(e)
     except Exception as e:
         handle_error(e)
 
@@ -282,33 +266,27 @@ def _generate_speech(
     device: Optional[str],
     checkpoint: Path,
     voice_handle: Optional[dict] = None,
+    language: Optional[str] = None,
 ) -> None:
-    """Generate speech and save to file.
-    
-    Args:
-        model_info: Model information
-        text: Text to synthesize
-        output: Output file path
-        voice: Optional reference voice path
-        device: Optional device override
-        checkpoint: Local checkpoint directory
-        voice_handle: Optional voice handle (dict)
-    """
     click.echo(f"Loading model: {model_info.name}")
-    
-    if device and device == "cuda" and not torch.cuda.is_available():
-        click.echo("Warning: CUDA requested but not available, falling back to CPU", err=True)
+
+    if device == "cuda" and not torch.cuda.is_available():
+        click.echo(
+            "Warning: CUDA requested but not available, falling back to CPU",
+            err=True,
+        )
         device = "cpu"
-    
+
     backend = create_backend(model_info, device=device, checkpoint_path=checkpoint)
-    
     click.echo(f"Generating speech for: '{text}'")
-    wav, sr = backend.generate(text, voice=voice, voice_handle=voice_handle)
-    
-    output_path = Path(output or DEFAULT_OUTPUT_FILENAME)
-    torchaudio.save(str(output_path), wav, sr)
-    
-    click.echo(f"✓ Audio saved to: {output_path}")
+    gen_kwargs = {}
+    if language:
+        gen_kwargs["language"] = language
+    wav, sr = backend.generate(
+        text, voice=voice, voice_handle=voice_handle, **gen_kwargs
+    )
+    out = save_wav(output or DEFAULT_OUTPUT_FILENAME, wav, sr)
+    click.echo(f"Audio saved to: {out}")
 
 
 @main.command()
@@ -485,8 +463,9 @@ def uninstall(purge_data: bool, yes: bool) -> None:
         click.echo("To remove the Wavhost package from this Python:")
         click.echo(f"  {sys.executable} -m pip uninstall wavhost")
         click.echo()
-        click.echo("Optional — also remove the Chatterbox engine:")
+        click.echo("Optional — also remove backend engines:")
         click.echo(f"  {sys.executable} -m pip uninstall chatterbox-tts")
+        click.echo(f"  {sys.executable} -m pip uninstall qwen-tts")
     except Exception as e:
         handle_error(e)
 

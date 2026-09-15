@@ -201,6 +201,28 @@ def test_materialize_checkpoint_hardlinks_or_copies(tmp_path):
     assert storage.checkpoint_ready("ns", "model", "latest", layers)
 
 
+def test_materialize_checkpoint_creates_nested_layer_dirs(tmp_path):
+    """Qwen layers live under speech_tokenizer/; parents must exist before copy."""
+    storage = WavhostStorage(base_path=tmp_path)
+    blob_content = b'{"model_type": "qwen3"}'
+    digest = hashlib.sha256(blob_content).hexdigest()
+    storage.get_blob_path(digest).write_bytes(blob_content)
+
+    layers = [
+        {
+            "filename": "speech_tokenizer/config.json",
+            "digest": digest,
+            "size": len(blob_content),
+        }
+    ]
+    ckpt = storage.materialize_checkpoint("qwen", "qwen-0.6-customvoice", "latest", layers)
+
+    nested = ckpt / "speech_tokenizer" / "config.json"
+    assert nested.is_file()
+    assert nested.read_bytes() == blob_content
+    assert storage.checkpoint_ready("qwen", "qwen-0.6-customvoice", "latest", layers)
+
+
 def test_materialize_missing_blob_raises(tmp_path):
     storage = WavhostStorage(base_path=tmp_path)
     with pytest.raises(StorageError, match="Missing blob"):

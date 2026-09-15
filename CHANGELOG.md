@@ -5,6 +5,21 @@ All notable changes to Wavhost are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-09-15
+
+### Added
+
+- Qwen3-TTS backend with CustomVoice and Base checkpoints (`qwen-0.6-*`, `qwen-1.7-*`)
+- Chatterbox Nano (`chatterbox-nano`) and Multilingual (`chatterbox-multilingual`) models
+- CLI/API `--language` support for multilingual synthesis
+- PCM16 WAV output path for more reliable playback
+- Website models page redesign with per-model `wavhost pull` commands
+
+### Changed
+
+- Lazy-load backends and simplify registry/storage paths
+- Docs and README updated for new models and languages
+
 ## [0.1.1] - 2026-09-15
 
 ### Added
