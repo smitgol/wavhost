@@ -11,9 +11,11 @@ def test_registry_list_models():
     registry = ModelRegistry()
     models = registry.list_models()
     
-    assert len(models) > 0
+    assert len(models) >= 4
     assert "chatterbox-turbo" in models
     assert "chatterbox-base" in models
+    assert "qwen-0.6b" in models
+    assert "qwen-1.7b" in models
 
 
 def test_get_model_info():
@@ -104,5 +106,26 @@ def test_get_all_models():
     
     all_models = registry.get_all_models()
     assert isinstance(all_models, dict)
-    assert len(all_models) >= 2
+    assert len(all_models) >= 4
     assert "chatterbox-turbo" in all_models
+    assert "qwen-0.6b" in all_models
+
+
+def test_qwen_models_info():
+    """Test Qwen model information."""
+    registry = ModelRegistry()
+    
+    qwen_06b = registry.get_model_info("qwen-0.6b")
+    assert qwen_06b.name == "qwen-0.6b"
+    assert qwen_06b.backend == "qwen"
+    assert qwen_06b.license == "Apache-2.0"
+    assert qwen_06b.namespace == "qwen"
+    assert qwen_06b.sample_rate == 24000
+    assert len(qwen_06b.languages) == 10
+    assert "en" in qwen_06b.languages
+    assert "zh" in qwen_06b.languages
+    
+    qwen_17b = registry.get_model_info("qwen-1.7b")
+    assert qwen_17b.name == "qwen-1.7b"
+    assert qwen_17b.backend == "qwen"
+    assert qwen_17b.vram_requirement == "~5GB"
