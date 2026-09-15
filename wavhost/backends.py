@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional, Protocol, Union
+from typing import Any, Optional, Protocol, Union
 
 import torch
 
@@ -28,13 +28,15 @@ class TTSBackend(Protocol):
         self,
         text: str,
         voice: Optional[str] = None,
+        voice_handle: Optional[Any] = None,
         **kwargs
     ) -> tuple[torch.Tensor, int]:
         """Generate speech from text.
         
         Args:
             text: Text to synthesize
-            voice: Optional voice identifier or reference audio path
+            voice: Optional path to reference voice audio (for ad-hoc cloning)
+            voice_handle: Optional pre-created voice handle or metadata
             **kwargs: Backend-specific parameters
             
         Returns:
@@ -42,6 +44,26 @@ class TTSBackend(Protocol):
             
         Raises:
             BackendError: If generation fails
+        """
+        ...
+    
+    @abstractmethod
+    def create_voice(
+        self,
+        ref_audio_path: str,
+        **kwargs
+    ) -> Any:
+        """Create a voice handle from reference audio.
+        
+        Args:
+            ref_audio_path: Path to reference audio file
+            **kwargs: Backend-specific parameters
+            
+        Returns:
+            Backend-specific voice handle or metadata
+            
+        Raises:
+            BackendError: If voice creation fails
         """
         ...
     
@@ -182,13 +204,15 @@ class ChatterboxBackend:
         self,
         text: str,
         voice: Optional[str] = None,
+        voice_handle: Optional[Any] = None,
         **kwargs
     ) -> tuple[torch.Tensor, int]:
         """Generate speech from text using Chatterbox.
         
         Args:
             text: Text to synthesize
-            voice: Optional path to reference voice audio (for voice cloning)
+            voice: Optional path to reference voice audio (for ad-hoc cloning)
+            voice_handle: Optional voice handle (dict with 'ref_audio_path' key for Chatterbox)
             **kwargs: Additional parameters passed to model.generate()
             
         Returns:
@@ -201,7 +225,19 @@ class ChatterboxBackend:
         
         generate_kwargs = kwargs.copy()
         
-        if voice:
+        # Prioritize voice_handle over voice parameter
+        if voice_handle:
+            if isinstance(voice_handle, dict) and "ref_audio_path" in voice_handle:
+                audio_path = Path(voice_handle["ref_audio_path"])
+                if not audio_path.exists():
+                    raise BackendError(f"Voice reference audio not found: {audio_path}")
+                logger.debug(f"Using saved voice from {audio_path}")
+                generate_kwargs['audio_prompt_path'] = str(audio_path)
+            else:
+                raise BackendError(
+                    f"Invalid voice handle for Chatterbox backend: {voice_handle}"
+                )
+        elif voice:
             voice_path = Path(voice)
             if not voice_path.exists():
                 raise BackendError(f"Reference voice audio not found: {voice}")
@@ -216,6 +252,35 @@ class ChatterboxBackend:
             
         except Exception as e:
             raise BackendError(f"Speech generation failed: {e}")
+    
+    def create_voice(
+        self,
+        ref_audio_path: str,
+        **kwargs
+    ) -> dict[str, str]:
+        """Create a voice handle from reference audio.
+        
+        For Chatterbox, we store the reference audio path since the model
+        doesn't have a separate voice creation step - it clones on-the-fly
+        during generation.
+        
+        Args:
+            ref_audio_path: Path to reference audio file
+            **kwargs: Unused (for API compatibility)
+            
+        Returns:
+            Dict with 'ref_audio_path' key
+            
+        Raises:
+            BackendError: If audio file doesn't exist
+        """
+        audio_path = Path(ref_audio_path)
+        if not audio_path.exists():
+            raise BackendError(f"Reference audio not found: {ref_audio_path}")
+        
+        return {
+            "ref_audio_path": str(audio_path),
+        }
     
     @property
     def sample_rate(self) -> int:
