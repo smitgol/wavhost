@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Final
 
-VERSION: Final[str] = "0.2.1"
+VERSION: Final[str] = "0.2.2"
 
 DEFAULT_HOST: Final[str] = "127.0.0.1"
 DEFAULT_PORT: Final[int] = 11435
