@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - OpenAI-compatible `stream` on `POST /v1/audio/speech` for progressive download of `mp3` and `pcm` / `pcm_*` audio
 
+### Changed
+
+- Website API and CLI docs: collapsible endpoint panels with copyable examples and JSON responses
+
+### Fixed
+
+- WAV output no longer requires TorchCodec (`torchaudio.save` in torchaudio 2.9+), so `response_format=wav` and CLI WAV files work without that extra package
+
 ## [0.2.0] - 2026-09-15
 
 ### Added
