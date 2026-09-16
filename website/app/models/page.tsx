@@ -8,7 +8,7 @@ import { CopyButton } from "@/components/CopyButton";
 export const metadata: Metadata = {
   title: "Models · Wavhost",
   description:
-    "Wavhost models — Chatterbox English + Multilingual (MIT) and Qwen3-TTS CustomVoice / Base (Apache-2.0).",
+    "Wavhost models — Chatterbox (MIT), Qwen3-TTS CustomVoice / Base, and Kokoro-82M (Apache-2.0).",
 };
 
 const CHATTERBOX_EN_LANGUAGES = ["English"] as const;
@@ -50,6 +50,17 @@ const QWEN_LANGUAGES = [
   "Portuguese",
   "Spanish",
   "Italian",
+] as const;
+
+const KOKORO_LANGUAGES = [
+  "English",
+  "Japanese",
+  "Chinese",
+  "Spanish",
+  "French",
+  "Hindi",
+  "Italian",
+  "Portuguese",
 ] as const;
 
 type ModelRow = {
@@ -113,6 +124,15 @@ const QWEN: ModelRow[] = [
     size: "1.7B",
     device: "GPU",
     notes: "Higher-quality voice cloning",
+  },
+];
+
+const KOKORO: ModelRow[] = [
+  {
+    id: "kokoro",
+    size: "82M",
+    device: "CPU/GPU",
+    notes: "54 named voices, default af_heart",
   },
 ];
 
@@ -245,6 +265,7 @@ export default function ModelsPage() {
               <a href="#chatterbox-english">Chatterbox English</a>
               <a href="#chatterbox-multilingual">Multilingual</a>
               <a href="#qwen3-tts">Qwen3-TTS</a>
+              <a href="#kokoro">Kokoro</a>
             </nav>
           </div>
         </header>
@@ -315,6 +336,42 @@ export default function ModelsPage() {
                   <CommandChip
                     text='wavhost run qwen-0.6-customvoice "Hello" --voice Ryan'
                     label="Copy Qwen CustomVoice run"
+                  />
+                </div>
+              </>
+            }
+          />
+
+          <ModelFamily
+            id="kokoro"
+            eyebrow="hexgrad"
+            title="Kokoro"
+            tags={["Apache-2.0", "8 languages"]}
+            description="Lightweight 82M StyleTTS 2 model with 54 named voicepacks. No reference-audio cloning — pick a speaker name."
+            languages={KOKORO_LANGUAGES}
+            models={KOKORO}
+            aside={
+              <>
+                <div className="model-note">
+                  <p>
+                    Default voice is <code>af_heart</code>. List every pack with{" "}
+                    <code>wavhost show kokoro</code>. Prefix is language + gender (
+                    <code>a</code> American, <code>b</code> British, <code>j</code> Japanese,{" "}
+                    <code>z</code> Mandarin, <code>e</code> Spanish, <code>f</code> French,{" "}
+                    <code>h</code> Hindi, <code>i</code> Italian, <code>p</code> Portuguese).
+                  </p>
+                  <p>
+                    English works out of the box. Spanish, French, Hindi, Italian, and Portuguese
+                    need <code>espeak-ng</code> on PATH. Japanese and Chinese need{" "}
+                    <code>pip install &apos;misaki[ja]&apos;</code> /{" "}
+                    <code>&apos;misaki[zh]&apos;</code>.
+                  </p>
+                </div>
+                <div className="model-aside-row">
+                  <span className="model-aside-label">Try</span>
+                  <CommandChip
+                    text='wavhost run kokoro "Hello from Kokoro" --voice af_heart'
+                    label="Copy Kokoro run"
                   />
                 </div>
               </>

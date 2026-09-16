@@ -71,6 +71,19 @@ class ModelInfo:
             "layers": [layer.to_dict() for layer in self.layers],
         }
 
+    def named_voices(self) -> tuple[str, ...]:
+        """Built-in speaker names. Empty when the model clones from reference audio."""
+        if self.backend == "kokoro":
+            return KOKORO_VOICES
+        if self.backend == "qwen" and self.model_kwargs.get("task") == "custom_voice":
+            return tuple(QWEN_SPEAKERS.values())
+        return ()
+
+    def default_named_voice(self) -> Optional[str]:
+        return self.model_kwargs.get("default_voice") or self.model_kwargs.get(
+            "default_speaker"
+        )
+
 
 CHATTERBOX_LICENSE_URL = "https://github.com/resemble-ai/chatterbox/blob/main/LICENSE"
 CHATTERBOX_NAMESPACE = "resemble"
@@ -79,6 +92,10 @@ CHATTERBOX_LICENSE = "MIT"
 QWEN_LICENSE_URL = "https://github.com/QwenLM/Qwen3-TTS/blob/main/LICENSE"
 QWEN_NAMESPACE = "qwen"
 QWEN_LICENSE = "Apache-2.0"
+
+KOKORO_LICENSE_URL = "https://github.com/hexgrad/kokoro/blob/main/LICENSE"
+KOKORO_NAMESPACE = "hexgrad"
+KOKORO_LICENSE = "Apache-2.0"
 
 
 def _hf_resolve(repo: str, filename: str) -> str:
@@ -209,6 +226,117 @@ QWEN_CUSTOMVOICE_KWARGS = {
 QWEN_BASE_KWARGS = {"task": "voice_clone"}
 
 
+# Official Kokoro v1.0: StyleTTS 2 + ISTFTNet. Not a Transformers LM —
+# there is no tokenizer.json / merges.txt / generation_config.json.
+# Vocab is IPA phonemes inside config.json; G2P is the misaki package.
+KOKORO_REPO = "hexgrad/Kokoro-82M"
+KOKORO_DEFAULT_VOICE = "af_heart"
+KOKORO_LANGUAGES = ["en", "ja", "zh", "es", "fr", "hi", "it", "pt"]
+KOKORO_VOICE_GROUPS = (
+    ("a", "American English"),
+    ("b", "British English"),
+    ("j", "Japanese"),
+    ("z", "Mandarin Chinese"),
+    ("e", "Spanish"),
+    ("f", "French"),
+    ("h", "Hindi"),
+    ("i", "Italian"),
+    ("p", "Brazilian Portuguese"),
+)
+
+# Voicepack stems from hexgrad/Kokoro-82M/voices. Prefix is language+gender:
+# a=en-US, b=en-GB, j=ja, z=zh, e=es, f=fr, h=hi, i=it, p=pt-BR; f=female, m=male.
+KOKORO_VOICES = (
+    "af_heart",
+    "af_alloy",
+    "af_aoede",
+    "af_bella",
+    "af_jessica",
+    "af_kore",
+    "af_nicole",
+    "af_nova",
+    "af_river",
+    "af_sarah",
+    "af_sky",
+    "am_adam",
+    "am_echo",
+    "am_eric",
+    "am_fenrir",
+    "am_liam",
+    "am_michael",
+    "am_onyx",
+    "am_puck",
+    "am_santa",
+    "bf_alice",
+    "bf_emma",
+    "bf_isabella",
+    "bf_lily",
+    "bm_daniel",
+    "bm_fable",
+    "bm_george",
+    "bm_lewis",
+    "jf_alpha",
+    "jf_gongitsune",
+    "jf_nezumi",
+    "jf_tebukuro",
+    "jm_kumo",
+    "zf_xiaobei",
+    "zf_xiaoni",
+    "zf_xiaoxiao",
+    "zf_xiaoyi",
+    "zm_yunjian",
+    "zm_yunxi",
+    "zm_yunxia",
+    "zm_yunyang",
+    "ef_dora",
+    "em_alex",
+    "em_santa",
+    "ff_siwis",
+    "hf_alpha",
+    "hf_beta",
+    "hm_omega",
+    "hm_psi",
+    "if_sara",
+    "im_nicola",
+    "pf_dora",
+    "pm_alex",
+    "pm_santa",
+)
+
+KOKORO_FILES = (
+    "config.json",
+    "kokoro-v1_0.pth",
+    *(f"voices/{name}.pt" for name in KOKORO_VOICES),
+)
+
+
+def format_named_voices(info: ModelInfo) -> str:
+    """Pretty-print built-in speakers for CLI ``show``."""
+    voices = info.named_voices()
+    if not voices:
+        return ""
+    default = info.default_named_voice()
+    if info.backend == "kokoro":
+        grouped: dict[str, list[str]] = {}
+        for name in voices:
+            grouped.setdefault(name[0], []).append(name)
+        lines: list[str] = []
+        for code, label in KOKORO_VOICE_GROUPS:
+            names = grouped.get(code)
+            if not names:
+                continue
+            pretty = [f"{n}*" if n == default else n for n in names]
+            lines.append(f"  {label} ({code}): {', '.join(pretty)}")
+        if default:
+            lines.append(f"  * default ({default})")
+        return "\n".join(lines)
+    pretty = [f"{n}*" if n == default else n for n in voices]
+    lines = [f"  {', '.join(pretty)}"]
+    if default:
+        lines.append(f"  * default ({default})")
+    return "\n".join(lines)
+
+
 def _qwen(
     name: str,
     repo: str,
@@ -324,6 +452,23 @@ BUILT_IN_MODELS = {
         "Qwen3-TTS 1.7B Base - higher-quality voice cloning (Apache-2.0)",
         QWEN_BASE_KWARGS,
         "~5GB",
+    ),
+    "kokoro": ModelInfo(
+        namespace=KOKORO_NAMESPACE,
+        name="kokoro",
+        tag="latest",
+        backend="kokoro",
+        description="Kokoro-82M - lightweight multilingual TTS, 54 named voices (Apache-2.0)",
+        license=KOKORO_LICENSE,
+        license_url=KOKORO_LICENSE_URL,
+        huggingface_repo=KOKORO_REPO,
+        model_class="KPipeline",
+        model_kwargs={"default_voice": KOKORO_DEFAULT_VOICE},
+        layers=_layers(KOKORO_REPO, KOKORO_FILES),
+        recommended_device="cpu",
+        vram_requirement="~500MB",
+        languages=list(KOKORO_LANGUAGES),
+        sample_rate=24000,
     ),
 }
 

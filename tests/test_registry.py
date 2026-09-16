@@ -20,6 +20,7 @@ def test_registry_list_models():
     assert "qwen-0.6-base" in models
     assert "qwen-1.7-customvoice" in models
     assert "qwen-1.7-base" in models
+    assert "kokoro" in models
     assert "qwen-0.6b" not in models
     assert "qwen-1.7b" not in models
 
@@ -149,6 +150,31 @@ def test_chatterbox_nano_model_kwargs():
     assert nano.model_kwargs == {"nano": True}
 
 
+def test_kokoro_registered():
+    """Kokoro ships StyleTTS2 weights + voicepacks, not a Transformers tokenizer."""
+    from wavhost.registry import KOKORO_DEFAULT_VOICE, KOKORO_VOICES
+
+    registry = ModelRegistry()
+    info = registry.get_model_info("kokoro")
+
+    assert info.backend == "kokoro"
+    assert info.namespace == "hexgrad"
+    assert info.model_class == "KPipeline"
+    assert info.huggingface_repo == "hexgrad/Kokoro-82M"
+    assert info.model_kwargs["default_voice"] == KOKORO_DEFAULT_VOICE
+    assert info.full_name == "hexgrad/kokoro:latest"
+    assert info.sample_rate == 24000
+
+    filenames = {layer.filename for layer in info.layers}
+    assert "config.json" in filenames
+    assert "kokoro-v1_0.pth" in filenames
+    assert f"voices/{KOKORO_DEFAULT_VOICE}.pt" in filenames
+    assert "model.safetensors" not in filenames
+    assert "tokenizer.json" not in filenames
+    assert len(info.layers) == 2 + len(KOKORO_VOICES)
+    assert all(layer.url.startswith("https://huggingface.co/hexgrad/Kokoro-82M/") for layer in info.layers)
+
+
 def test_chatterbox_multilingual_registered():
     registry = ModelRegistry()
     mtl = registry.get_model_info("chatterbox-multilingual")
@@ -157,3 +183,35 @@ def test_chatterbox_multilingual_registered():
     assert mtl.model_kwargs.get("default_language") == "en"
     assert "fr" in mtl.languages and "zh" in mtl.languages
     assert any(layer.filename == "t3_mtl23ls_v2.safetensors" for layer in mtl.layers)
+
+
+def test_named_voices_by_backend():
+    registry = ModelRegistry()
+
+    kokoro = registry.get_model_info("kokoro")
+    assert kokoro.default_named_voice() == "af_heart"
+    assert "af_heart" in kokoro.named_voices()
+    assert "bm_george" in kokoro.named_voices()
+    assert len(kokoro.named_voices()) == 54
+
+    qwen = registry.get_model_info("qwen-0.6-customvoice")
+    assert qwen.default_named_voice() == "Ryan"
+    assert "Aiden" in qwen.named_voices()
+
+    clone = registry.get_model_info("qwen-0.6-base")
+    assert clone.named_voices() == ()
+
+    turbo = registry.get_model_info("chatterbox-turbo")
+    assert turbo.named_voices() == ()
+    assert turbo.default_named_voice() is None
+
+
+def test_format_named_voices_groups_kokoro():
+    from wavhost.registry import format_named_voices
+
+    registry = ModelRegistry()
+    text = format_named_voices(registry.get_model_info("kokoro"))
+    assert "American English (a):" in text
+    assert "af_heart*" in text
+    assert "bm_george" in text
+    assert "* default (af_heart)" in text

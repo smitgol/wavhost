@@ -112,16 +112,17 @@ class SpeechRequest(BaseModel):
     voice: str = Field(
         default="default",
         description=(
-            "Voice to use: 'default' (model built-in / Qwen Ryan), a CustomVoice "
-            "speaker name (Ryan, Aiden, ...), a saved voice, or a reference audio "
-            "path (Qwen Base / Chatterbox)"
+            "Voice to use: 'default' (model built-in / Qwen Ryan / Kokoro af_heart), "
+            "a named speaker (Qwen: Ryan, Aiden, …; Kokoro: af_heart, bm_george, …), "
+            "a saved voice, or a reference audio path (Qwen Base / Chatterbox)"
         ),
     )
     language: Optional[str] = Field(
         default=None,
         description=(
             "Language for synthesis. Chatterbox Multilingual: ISO code "
-            "(en, fr, zh, …). Qwen: English, Chinese, Japanese, …"
+            "(en, fr, zh, …). Qwen: English, Chinese, Japanese, … "
+            "Kokoro: en, ja, zh, or a voice prefix (a, b, j, z)"
         ),
     )
     response_format: AudioFormat = Field(
@@ -136,7 +137,7 @@ class SpeechRequest(BaseModel):
         default=1.0,
         ge=MIN_SPEED,
         le=MAX_SPEED,
-        description="Speed of the audio (currently not implemented)"
+        description="Speed of the audio (currently ignored)",
     )
     stream: bool = Field(
         default=False,
@@ -156,6 +157,8 @@ class ModelData(BaseModel):
     owned_by: str
     installed: bool
     description: str
+    speakers: list[str] = Field(default_factory=list)
+    default_voice: Optional[str] = None
 
 
 class ModelsResponse(BaseModel):
@@ -364,6 +367,8 @@ async def list_models():
                 owned_by=model_info.namespace,
                 installed=is_installed,
                 description=model_info.description,
+                speakers=list(model_info.named_voices()),
+                default_voice=model_info.default_named_voice(),
             ))
         
         return ModelsResponse(data=models_data)

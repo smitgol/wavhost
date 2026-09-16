@@ -66,6 +66,12 @@ BACKEND_REQUIREMENTS: dict[str, BackendRequirement] = {
         packages=("qwen-tts>=0.1.0",),
         import_probes=("qwen_tts", "transformers"),
     ),
+    "kokoro": BackendRequirement(
+        extra="kokoro",
+        import_name="kokoro",
+        packages=("kokoro>=0.9.2",),
+        import_probes=("kokoro",),
+    ),
 }
 
 

@@ -61,6 +61,9 @@ chatterbox = [
 qwen = [
     "qwen-tts>=0.1.0",
 ]
+kokoro = [
+    "kokoro>=0.9.2",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",

@@ -63,12 +63,14 @@ export default function DocsPage() {
         <div className="flex flex-wrap gap-2 pb-3">
           <Badge variant="secondary">Chatterbox · MIT</Badge>
           <Badge variant="secondary">Qwen3-TTS · Apache-2.0</Badge>
+          <Badge variant="secondary">Kokoro · Apache-2.0</Badge>
         </div>
         <div className="code-wrap">
           <CopyButton
             text={`wavhost pull chatterbox-turbo
 wavhost pull chatterbox-multilingual
-wavhost pull qwen-0.6-customvoice`}
+wavhost pull qwen-0.6-customvoice
+wavhost pull kokoro`}
             className="copy-btn copy-btn--block"
             label="Copy pull"
           />
@@ -76,13 +78,15 @@ wavhost pull qwen-0.6-customvoice`}
             <code data-copy>
               {`wavhost pull chatterbox-turbo
 wavhost pull chatterbox-multilingual
-wavhost pull qwen-0.6-customvoice`}
+wavhost pull qwen-0.6-customvoice
+wavhost pull kokoro`}
             </code>
           </pre>
         </div>
         <p>
           Shows the license, installs the engine if needed (
-          <code>chatterbox-tts</code> or <code>qwen-tts</code>), and downloads weights into{" "}
+          <code>chatterbox-tts</code>, <code>qwen-tts</code>, or <code>kokoro</code>), and
+          downloads weights into{" "}
           <code>~/.wavhost</code>. See the full list on{" "}
           <Link href="/models">Models</Link>.
         </p>
@@ -92,7 +96,8 @@ wavhost pull qwen-0.6-customvoice`}
           <CopyButton
             text={`wavhost run chatterbox-turbo "Hello world, this is Wavhost!" -o output.wav
 wavhost run chatterbox-multilingual "Bonjour, comment ça va?" -l fr -o fr.wav
-wavhost run qwen-0.6-customvoice "Hello world" --voice Ryan -o qwen.wav`}
+wavhost run qwen-0.6-customvoice "Hello world" --voice Ryan -o qwen.wav
+wavhost run kokoro "Hello from Kokoro" --voice af_heart -o hello.wav`}
             className="copy-btn copy-btn--block"
             label="Copy run"
           />
@@ -100,7 +105,8 @@ wavhost run qwen-0.6-customvoice "Hello world" --voice Ryan -o qwen.wav`}
             <code data-copy>
               {`wavhost run chatterbox-turbo "Hello world, this is Wavhost!" -o output.wav
 wavhost run chatterbox-multilingual "Bonjour, comment ça va?" -l fr -o fr.wav
-wavhost run qwen-0.6-customvoice "Hello world" --voice Ryan -o qwen.wav`}
+wavhost run qwen-0.6-customvoice "Hello world" --voice Ryan -o qwen.wav
+wavhost run kokoro "Hello from Kokoro" --voice af_heart -o hello.wav`}
             </code>
           </pre>
         </div>
@@ -111,6 +117,13 @@ wavhost run qwen-0.6-customvoice "Hello world" --voice Ryan -o qwen.wav`}
             <code>Serena</code>, <code>Uncle_Fu</code>, <code>Dylan</code>, <code>Eric</code>,{" "}
             <code>Ono_Anna</code>, or <code>Sohee</code>. For cloning, pull a{" "}
             <code>qwen-*-base</code> model and pass a saved voice or audio path.
+          </AlertDescription>
+        </Alert>
+        <Alert>
+          <AlertTitle>Kokoro named voices</AlertTitle>
+          <AlertDescription>
+            Pass <code>--voice af_heart</code> (default) or any pack from{" "}
+            <code>wavhost show kokoro</code>. Kokoro does not clone from reference audio.
           </AlertDescription>
         </Alert>
 
@@ -169,8 +182,8 @@ curl http://localhost:11435/v1/audio/speech \\
         </div>
         <p>
           Default listen address is <code>http://localhost:11435</code>. Use{" "}
-          <code>&quot;voice&quot;: &quot;default&quot;</code> for the built-in stock voice (or
-          Qwen Ryan).
+          <code>&quot;voice&quot;: &quot;default&quot;</code> for the built-in stock voice (Qwen
+          Ryan or Kokoro <code>af_heart</code>).
         </p>
 
         <nav className="docs-pager" aria-label="Next page">

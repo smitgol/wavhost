@@ -222,3 +222,37 @@ def test_uninstall_keep_data_skips_purge(storage, engine, fake_pull):
     assert "Kept local data" in result.output
     assert storage.manifest_exists("resemble", "chatterbox-turbo", "latest")
     assert "pip uninstall wavhost" in result.output
+
+
+def test_show_kokoro_lists_named_voices(storage):
+    result = CliRunner().invoke(main, ["show", "kokoro"])
+
+    assert result.exit_code == 0, result.output
+    assert "hexgrad/kokoro:latest" in result.output
+    assert "af_heart*" in result.output
+    assert "bm_george" in result.output
+    assert "American English" in result.output
+    assert "wavhost pull kokoro" in result.output
+
+
+def test_show_unknown_model_lists_alternatives(storage):
+    result = CliRunner().invoke(main, ["show", "no-such-model"])
+
+    assert result.exit_code == 1
+    assert "chatterbox-turbo" in result.output
+    assert "kokoro" in result.output
+
+
+def test_list_points_at_show(storage):
+    result = CliRunner().invoke(main, ["list"])
+
+    assert result.exit_code == 0, result.output
+    assert "kokoro" in result.output
+    assert "wavhost show <model>" in result.output
+
+
+def test_uninstall_mentions_kokoro(storage, engine, fake_pull):
+    result = CliRunner().invoke(main, ["uninstall", "--keep-data", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "pip uninstall kokoro" in result.output
