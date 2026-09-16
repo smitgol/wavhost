@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "CLI · Docs · Wavhost",
-  description: "Wavhost CLI reference — pull, run, voice, serve, list, rm, uninstall.",
+  description: "Wavhost CLI reference — pull, run, show, voice, serve, list, rm, uninstall.",
 };
 
 function CommandChip({ text, label }: { text: string; label: string }) {
@@ -79,6 +79,7 @@ function CommandPanel({
 const PULL_EXAMPLES = `wavhost pull chatterbox-turbo
 wavhost pull chatterbox-multilingual
 wavhost pull qwen-0.6-customvoice
+wavhost pull kokoro
 wavhost pull qwen-0.6-base --force
 wavhost pull chatterbox-turbo --skip-deps`;
 
@@ -87,7 +88,8 @@ wavhost run chatterbox-turbo "Hello" --voice my-voice -o hello.wav
 wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
 wavhost run qwen-0.6-customvoice "Hello" --voice Ryan -o qwen.wav
 wavhost run qwen-0.6-base "Hello" --voice /path/to/audio.wav -o clone.wav
-wavhost run chatterbox-multilingual "Bonjour" --language fr -o fr.wav`;
+wavhost run chatterbox-multilingual "Bonjour" --language fr -o fr.wav
+wavhost run kokoro "Hello from Kokoro" --voice af_heart -o hello.wav`;
 
 export default function CLIPage() {
   const toc = [
@@ -150,12 +152,12 @@ export default function CLIPage() {
                 Output WAV path (default <code>output.wav</code>)
               </Param>
               <Param name="--voice">
-                Saved voice, reference audio path, or Qwen CustomVoice speaker (
-                <code>Ryan</code>, <code>Aiden</code>, …)
+                Saved voice, reference audio path, or named speaker (Qwen: <code>Ryan</code>,{" "}
+                <code>Aiden</code>, …; Kokoro: <code>af_heart</code>, <code>bm_george</code>, …)
               </Param>
               <Param name="--language, -l">
-                Multilingual ISO (<code>en</code>, <code>fr</code>, <code>zh</code>, …) or Qwen
-                names (<code>English</code>, …)
+                Multilingual ISO (<code>en</code>, <code>fr</code>, <code>zh</code>, …), Qwen names
+                (<code>English</code>, …), or Kokoro ISO / voice prefix
               </Param>
               <Param name="--device">
                 <code>cuda</code>, <code>cpu</code>, or <code>mps</code>
@@ -248,6 +250,13 @@ wavhost serve --host 0.0.0.0 --port 8000 --reload`}
             </li>
             <li className="endpoint-row endpoint-row--plain">
               <div className="endpoint-row-main">
+                <code className="endpoint-row-path">show</code>
+                <p className="endpoint-row-notes">Model details and named voices</p>
+              </div>
+              <CommandChip text="wavhost show kokoro" label="Copy show" />
+            </li>
+            <li className="endpoint-row endpoint-row--plain">
+              <div className="endpoint-row-main">
                 <code className="endpoint-row-path">rm</code>
                 <p className="endpoint-row-notes">Remove a pulled model</p>
               </div>
@@ -267,7 +276,7 @@ wavhost serve --host 0.0.0.0 --port 8000 --reload`}
           <div className="model-note">
             <p>
               Remove the package with <code>pip uninstall wavhost</code>. Optional engines:{" "}
-              <code>pip uninstall chatterbox-tts qwen-tts</code>.
+              <code>pip uninstall chatterbox-tts qwen-tts kokoro</code>.
             </p>
           </div>
         </div>

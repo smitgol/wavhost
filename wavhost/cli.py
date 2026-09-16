@@ -23,7 +23,7 @@ from wavhost.exceptions import (
     WavhostError,
 )
 from wavhost.logging_config import setup_logger
-from wavhost.registry import ModelRegistry
+from wavhost.registry import ModelRegistry, format_named_voices
 from wavhost.storage import WavhostStorage
 from wavhost.voices import (
     VoiceAlreadyExistsError,
@@ -56,6 +56,7 @@ def display_available_models(registry: ModelRegistry) -> None:
     for name in registry.list_models():
         info = registry.get_model_info(name)
         click.echo(f"  {name:<24} - {info.description}")
+    click.echo("\nDetails: wavhost show <model>")
 
 
 @click.group()
@@ -202,8 +203,9 @@ def _pull_model(storage: WavhostStorage, model_info, *, force: bool = False) -> 
     "--voice",
     type=str,
     help=(
-        "Saved voice name, reference audio path, or Qwen CustomVoice speaker "
-        "(Ryan, Aiden, Vivian, ...). Omit for the model default."
+        "Saved voice name, reference audio path, or named speaker "
+        "(Qwen: Ryan, Aiden, …; Kokoro: af_heart, bm_george, …). "
+        "Omit for the model default."
     ),
 )
 @click.option(
@@ -213,7 +215,8 @@ def _pull_model(storage: WavhostStorage, model_info, *, force: bool = False) -> 
     default=None,
     help=(
         "Language for synthesis. Chatterbox Multilingual: ISO code "
-        "(en, fr, zh, …). Qwen: English, Chinese, …"
+        "(en, fr, zh, …). Qwen: English, Chinese, … "
+        "Kokoro: en, ja, zh, or a voice prefix (a, b, j, z)."
     ),
 )
 @click.option("--device", type=str, help="Device to use (cuda/cpu/mps)")
@@ -279,7 +282,7 @@ def _generate_speech(
 
     backend = create_backend(model_info, device=device, checkpoint_path=checkpoint)
     click.echo(f"Generating speech for: '{text}'")
-    gen_kwargs = {}
+    gen_kwargs: dict = {}
     if language:
         gen_kwargs["language"] = language
     wav, sr = backend.generate(
@@ -354,6 +357,60 @@ def list_models() -> None:
         
         display_available_models(registry)
         
+    except Exception as e:
+        handle_error(e)
+
+
+@main.command("show")
+@click.argument("model_name")
+def show_model(model_name: str) -> None:
+    """Show details for a registry model, including named voices.
+
+    Example: wavhost show kokoro
+    """
+    try:
+        registry = ModelRegistry()
+        storage = WavhostStorage()
+        info = registry.get_model_info(model_name)
+        installed = storage.manifest_exists(info.namespace, info.name, info.tag)
+        device = info.recommended_device
+        if info.vram_requirement:
+            device = f"{device} ({info.vram_requirement})"
+
+        click.echo(f"Model: {info.name}")
+        click.echo(f"Full name: {info.full_name}")
+        click.echo(f"Backend: {info.backend}")
+        click.echo(f"Installed: {'yes' if installed else 'no'}")
+        click.echo(f"Description: {info.description}")
+        click.echo(f"License: {info.license} ({info.license_url})")
+        click.echo(f"Languages: {', '.join(info.languages)}")
+        click.echo(f"Sample rate: {info.sample_rate} Hz")
+        click.echo(f"Device: {device}")
+
+        voices = format_named_voices(info)
+        if voices:
+            click.echo("Named voices:")
+            click.echo(voices)
+        elif info.model_kwargs.get("task") == "voice_clone":
+            click.echo(
+                "Voices: reference-audio cloning "
+                "(wavhost voice create / --voice file.wav)"
+            )
+        else:
+            click.echo("Voices: model default or reference-audio cloning")
+
+        if installed:
+            example_voice = info.default_named_voice()
+            voice_bit = f" --voice {example_voice}" if example_voice else ""
+            click.echo(
+                f'\nRun with: wavhost run {info.name} "Hello"{voice_bit}'
+            )
+        else:
+            click.echo(f"\nPull with: wavhost pull {info.name}")
+    except ModelNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        display_available_models(ModelRegistry())
+        sys.exit(1)
     except Exception as e:
         handle_error(e)
 
@@ -466,6 +523,7 @@ def uninstall(purge_data: bool, yes: bool) -> None:
         click.echo("Optional — also remove backend engines:")
         click.echo(f"  {sys.executable} -m pip uninstall chatterbox-tts")
         click.echo(f"  {sys.executable} -m pip uninstall qwen-tts")
+        click.echo(f"  {sys.executable} -m pip uninstall kokoro")
     except Exception as e:
         handle_error(e)
 

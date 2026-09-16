@@ -1,6 +1,6 @@
 """Wavhost - Local-first TTS runtime."""
 
-from wavhost.backends import ChatterboxBackend, QwenBackend, TTSBackend, create_backend
+from wavhost.backends import ChatterboxBackend, KokoroBackend, QwenBackend, TTSBackend, create_backend
 from wavhost.config import VERSION
 from wavhost.exceptions import (
     BackendError,
@@ -18,6 +18,7 @@ __all__ = [
     "TTSBackend",
     "ChatterboxBackend",
     "QwenBackend",
+    "KokoroBackend",
     "create_backend",
     "ModelRegistry",
     "ModelInfo",

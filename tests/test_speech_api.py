@@ -221,3 +221,13 @@ def test_stream_rejects_unsupported_formats(client, mock_speech, fmt):
     assert "stream=true" in detail
     assert fmt in detail
     mock_speech["generate"].assert_not_called()
+
+
+def test_models_list_includes_kokoro_speakers(client):
+    response = client.get("/v1/models")
+    assert response.status_code == 200
+    models = {item["id"]: item for item in response.json()["data"]}
+    assert "af_heart" in models["kokoro"]["speakers"]
+    assert models["kokoro"]["default_voice"] == "af_heart"
+    assert models["qwen-0.6-customvoice"]["default_voice"] == "Ryan"
+    assert models["chatterbox-turbo"]["speakers"] == []

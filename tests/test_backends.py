@@ -10,6 +10,7 @@ from wavhost.backends import (
     BACKEND_NAME,
     QWEN_BACKEND_NAME,
     ChatterboxBackend,
+    KokoroBackend,
     QwenBackend,
     _load_chatterbox_turbo,
     create_backend,
@@ -580,3 +581,264 @@ def test_qwen_generate_returns_channels_first_2d(checkpoint):
     assert wav.ndim == 2
     assert wav.shape == (1, 4800)
     assert wav.dtype == torch.float32
+
+
+class _FakeKokoroResult:
+    def __init__(self, samples: int):
+        self.audio = torch.ones(samples)
+
+
+class _FakeKokoroPipeline:
+    """Stand-in for kokoro.KPipeline that records calls and yields dummy audio."""
+
+    def __init__(self, chunks: tuple[int, ...] = (16,)):
+        self.voices: dict = {}
+        self.calls: list[dict] = []
+        self.chunks = chunks
+
+    def __call__(self, text, voice=None, speed=1, split_pattern=None):
+        self.calls.append(
+            {
+                "text": text,
+                "voice": voice,
+                "speed": speed,
+                "split_pattern": split_pattern,
+            }
+        )
+        for n in self.chunks:
+            yield _FakeKokoroResult(n)
+
+
+def _kokoro_backend_with_pipeline(checkpoint, pipeline, lang_code="a"):
+    backend = KokoroBackend(
+        model_class="KPipeline",
+        checkpoint_path=checkpoint,
+        model_kwargs={"default_voice": "af_heart"},
+        device=CPU_DEVICE,
+    )
+    backend._model = object()
+    backend._pipelines[lang_code] = pipeline
+    return backend
+
+
+def test_kokoro_backend_creation(checkpoint):
+    registry = ModelRegistry()
+    model_info = registry.get_model_info("kokoro")
+
+    backend = create_backend(
+        model_info, device=CPU_DEVICE, checkpoint_path=checkpoint
+    )
+    assert isinstance(backend, KokoroBackend)
+    assert backend.sample_rate == DEFAULT_SAMPLE_RATE
+    assert backend._model is None
+
+
+def test_kokoro_defaults_to_af_heart(checkpoint):
+    pipeline = _FakeKokoroPipeline()
+    pipeline.voices["af_heart"] = torch.zeros(1)
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+
+    wav, sr = backend.generate("Hello")
+
+    assert sr == 24000
+    assert wav.shape == (1, 16)
+    assert pipeline.calls[0]["voice"] == "af_heart"
+    assert pipeline.calls[0]["text"] == "Hello"
+
+
+def test_kokoro_accepts_named_voice(checkpoint):
+    pipeline = _FakeKokoroPipeline()
+    pipeline.voices["bm_george"] = torch.zeros(1)
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline, lang_code="b")
+
+    backend.generate("Hello", voice="bm_george")
+
+    assert pipeline.calls[0]["voice"] == "bm_george"
+
+
+def test_kokoro_unknown_voice_raises(checkpoint):
+    pipeline = _FakeKokoroPipeline()
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+
+    with pytest.raises(BackendError, match="Unknown Kokoro voice"):
+        backend.generate("Hello", voice="not_a_voice")
+
+
+def test_kokoro_rejects_ref_audio(checkpoint, tmp_path):
+    voice_file = tmp_path / "voice.wav"
+    voice_file.write_bytes(b"")
+    pipeline = _FakeKokoroPipeline()
+    pipeline.voices["af_heart"] = torch.zeros(1)
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+
+    with pytest.raises(BackendError, match="named voices"):
+        backend.generate("Hello", voice=str(voice_file))
+
+
+def test_kokoro_rejects_voice_handle(checkpoint, tmp_path):
+    voice_file = tmp_path / "voice.wav"
+    voice_file.write_bytes(b"")
+    pipeline = _FakeKokoroPipeline()
+    pipeline.voices["af_heart"] = torch.zeros(1)
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+
+    with pytest.raises(BackendError, match="named voices"):
+        backend.generate(
+            "Hello", voice_handle={"ref_audio_path": str(voice_file)}
+        )
+
+
+def test_kokoro_concatenates_chunks(checkpoint):
+    pipeline = _FakeKokoroPipeline(chunks=(4, 6))
+    pipeline.voices["af_heart"] = torch.zeros(1)
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+
+    wav, sr = backend.generate("Hello")
+
+    assert sr == 24000
+    assert wav.shape == (1, 10)
+    assert wav.dtype == torch.float32
+
+
+def test_kokoro_language_selects_pipeline(checkpoint):
+    british = _FakeKokoroPipeline()
+    british.voices["bf_emma"] = torch.zeros(1)
+    american = _FakeKokoroPipeline()
+    american.voices["bf_emma"] = torch.zeros(1)
+
+    backend = KokoroBackend(
+        model_class="KPipeline",
+        checkpoint_path=checkpoint,
+        model_kwargs={"default_voice": "af_heart"},
+        device=CPU_DEVICE,
+    )
+    backend._model = object()
+    backend._pipelines["a"] = american
+    backend._pipelines["b"] = british
+
+    backend.generate("Hello", voice="bf_emma")
+
+    assert british.calls
+    assert not american.calls
+
+
+def test_kokoro_missing_voicepack_raises(checkpoint):
+    pipeline = _FakeKokoroPipeline()
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+
+    with pytest.raises(BackendError, match="voicepack not found"):
+        backend.generate("Hello", voice="af_heart")
+
+
+def test_kokoro_loads_voicepack_from_checkpoint(checkpoint):
+    voices = checkpoint / "voices"
+    voices.mkdir()
+    torch.save(torch.zeros(1, 256), voices / "af_heart.pt")
+
+    pipeline = _FakeKokoroPipeline()
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline)
+    backend.generate("Hello")
+
+    assert "af_heart" in pipeline.voices
+    assert pipeline.calls[0]["voice"] == "af_heart"
+
+
+def test_kokoro_load_uses_local_files(monkeypatch, checkpoint):
+    """KModel is constructed from checkpoint paths, not Hugging Face."""
+    (checkpoint / "config.json").write_text("{}")
+    (checkpoint / "kokoro-v1_0.pth").write_bytes(b"x")
+
+    recorded = {}
+
+    class FakeKModel:
+        def __init__(self, repo_id=None, config=None, model=None, **kwargs):
+            recorded.update(repo_id=repo_id, config=config, model=model)
+
+        def to(self, device):
+            recorded["device"] = device
+            return self
+
+        def eval(self):
+            recorded["eval"] = True
+            return self
+
+    import sys
+    import types
+
+    fake = types.SimpleNamespace(KModel=FakeKModel)
+    monkeypatch.setitem(sys.modules, "kokoro", fake)
+    monkeypatch.setattr(
+        "wavhost.backends.dependencies.is_installed", lambda backend: True
+    )
+
+    backend = KokoroBackend(
+        model_class="KPipeline",
+        checkpoint_path=checkpoint,
+        device=CPU_DEVICE,
+    )
+    backend._load_model()
+
+    assert recorded["repo_id"] == "hexgrad/Kokoro-82M"
+    assert recorded["config"] == str(checkpoint / "config.json")
+    assert recorded["model"] == str(checkpoint / "kokoro-v1_0.pth")
+    assert recorded["device"] == CPU_DEVICE
+    assert recorded["eval"] is True
+
+
+def test_kokoro_load_requires_weight_files(monkeypatch, checkpoint):
+    monkeypatch.setattr(
+        "wavhost.backends.dependencies.is_installed", lambda backend: True
+    )
+    backend = KokoroBackend(
+        model_class="KPipeline",
+        checkpoint_path=checkpoint,
+        device=CPU_DEVICE,
+    )
+    with pytest.raises(BackendError, match="missing config.json"):
+        backend._load_model()
+
+
+def test_kokoro_reports_missing_engine(monkeypatch, checkpoint):
+    monkeypatch.setattr(
+        "wavhost.backends.dependencies.is_installed", lambda backend: False
+    )
+    backend = KokoroBackend(
+        model_class="KPipeline",
+        checkpoint_path=checkpoint,
+        device=CPU_DEVICE,
+    )
+    with pytest.raises(BackendError, match="wavhost pull"):
+        backend.generate("Hello")
+
+
+def test_kokoro_backend_missing_checkpoint(tmp_path):
+    with pytest.raises(BackendError, match="Checkpoint directory not found"):
+        KokoroBackend(
+            model_class="KPipeline",
+            checkpoint_path=tmp_path / "missing",
+            device=CPU_DEVICE,
+        )
+
+
+def test_kokoro_espeak_error_is_friendly(checkpoint):
+    from wavhost.backends import _friendly_kokoro_error
+
+    class BoomPipeline(_FakeKokoroPipeline):
+        def __call__(self, *args, **kwargs):
+            raise RuntimeError("espeak-ng not found")
+
+    pipeline = BoomPipeline()
+    pipeline.voices["ef_dora"] = torch.zeros(1)
+    backend = _kokoro_backend_with_pipeline(checkpoint, pipeline, lang_code="e")
+
+    with pytest.raises(BackendError, match="espeak-ng"):
+        backend.generate("Hola", voice="ef_dora")
+
+    ja = _friendly_kokoro_error(ImportError("No module named 'misaki.ja'"), "j")
+    assert "misaki[ja]" in ja
+
+
+def test_chatterbox_ignores_speed(monkeypatch, checkpoint):
+    backend = _backend_with_fake_model(monkeypatch, checkpoint)
+    backend.generate("Hello world", speed=1.5)
+    assert "speed" not in backend._model.generate_kwargs

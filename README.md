@@ -154,6 +154,7 @@ wavhost voice rm my-narrator
 | `qwen-0.6-base` | 600M | GPU | 10 langs | Base: voice cloning from reference audio (Apache-2.0) |
 | `qwen-1.7-customvoice` | 1.7B | GPU | 10 langs | CustomVoice + style instructions, default **Ryan** (Apache-2.0) |
 | `qwen-1.7-base` | 1.7B | GPU | 10 langs | Base: higher-quality voice cloning (Apache-2.0) |
+| `kokoro` | 82M | CPU/GPU | 8 langs | 54 named voices, default **af_heart** (Apache-2.0) |
 
 **Chatterbox models** (MIT License by Resemble AI):
 
@@ -164,6 +165,13 @@ wavhost voice rm my-narrator
 
 - **CustomVoice** (`qwen-0.6-customvoice`, `qwen-1.7-customvoice`): nine built-in speakers. Default is `Ryan` (English). Other speakers: `Aiden` (English), `Vivian` / `Serena` / `Uncle_Fu` (Chinese), `Dylan` (Beijing), `Eric` (Sichuan), `Ono_Anna` (Japanese), `Sohee` (Korean). No reference audio required.
 - **Base** (`qwen-0.6-base`, `qwen-1.7-base`): zero-shot cloning in any supported language. Pass `--voice` with a saved voice or a reference audio file.
+
+**Kokoro** (Apache-2.0 by hexgrad) is an 82M StyleTTS 2 model with **54 named voices** across American/British English, Japanese, Mandarin, Spanish, French, Hindi, Italian, and Portuguese. Default voice is `af_heart`. List them with `wavhost show kokoro`. Spanish/French/Hindi/Italian/Portuguese need [espeak-ng](https://github.com/espeak-ng/espeak-ng) on PATH; Japanese/Chinese need `pip install 'misaki[ja]'` / `'misaki[zh]'`.
+
+```bash
+wavhost pull kokoro
+wavhost run kokoro "Hello from Kokoro" --voice bm_george -o george.wav
+```
 
 ## CLI Reference
 
@@ -186,8 +194,8 @@ Generate speech from text using a local model.
 
 **Options:**
 - `-o, --output PATH`: Output WAV file path (default: `output.wav`)
-- `--voice NAME_OR_PATH`: Saved voice, reference audio path, or Qwen CustomVoice speaker (`Ryan`, `Aiden`, ...)
-- `--language, -l CODE_OR_NAME`: Language for synthesis (Chatterbox Multilingual ISO codes like `fr`; Qwen names like `English`)
+- `--voice NAME_OR_PATH`: Saved voice, reference audio path, or named speaker (Qwen: `Ryan`, `Aiden`, …; Kokoro: `af_heart`, `bm_george`, …)
+- `--language, -l CODE_OR_NAME`: Language for synthesis (Chatterbox Multilingual ISO codes like `fr`; Qwen names like `English`; Kokoro ISO or voice prefix)
 - `--device DEVICE`: Device to use (`cuda`, `cpu`, or `mps`)
 
 **Example:**
@@ -202,6 +210,9 @@ wavhost run chatterbox-turbo "Hello" --voice /path/to/audio.wav -o hello.wav
 
 # Qwen CustomVoice named speaker
 wavhost run qwen-0.6-customvoice "Hello" --voice Aiden -o aiden.wav
+
+# Kokoro named voice
+wavhost run kokoro "Hello from Kokoro" --voice af_heart -o hello.wav
 
 # Chatterbox Multilingual (ISO language code)
 wavhost run chatterbox-multilingual "Bonjour, comment ça va?" --language fr -o fr.wav
@@ -275,6 +286,15 @@ List installed models and available models in the registry.
 **Example:**
 ```bash
 wavhost list
+```
+
+### `wavhost show <model_name>`
+
+Show registry details for a model, including named voices (Qwen CustomVoice speakers, Kokoro voicepacks).
+
+**Example:**
+```bash
+wavhost show kokoro
 ```
 
 ### `wavhost rm <model_name>`
@@ -428,7 +448,7 @@ Generate speech from text (OpenAI-compatible).
 - `response_format` (string, optional): Audio format. Defaults to `mp3`.
   - Encoded: `mp3`, `wav`, `opus`, `flac`, `aac`
   - Raw PCM (signed 16-bit little-endian): `pcm` (model native rate), `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`
-- `speed` (float, optional): Speed multiplier 0.25-4.0 (currently not implemented)
+- `speed` (float, optional): Speed multiplier 0.25-4.0 (currently ignored)
 - `stream` (bool, optional): If `true`, return audio as a progressive download (chunked bytes). Defaults to `false`.
   - Allowed with `stream=true`: `mp3`, `pcm`, `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`
   - Not allowed: `wav`, `opus`, `aac`, `flac` (HTTP 400)

@@ -11,6 +11,9 @@ from wavhost.config import CPU_DEVICE, DEFAULT_DEVICE, DEFAULT_SAMPLE_RATE
 from wavhost.exceptions import BackendError
 from wavhost.logging_config import get_logger
 from wavhost.registry import (
+    KOKORO_DEFAULT_VOICE,
+    KOKORO_REPO,
+    KOKORO_VOICES,
     ModelInfo,
     QWEN_DEFAULT_SPEAKER,
     QWEN_SPEAKERS,
@@ -20,6 +23,49 @@ logger = get_logger(__name__)
 
 CHATTERBOX = "chatterbox"
 QWEN = "qwen"
+KOKORO = "kokoro"
+
+# Kept for older imports / tests.
+BACKEND_NAME = CHATTERBOX
+QWEN_BACKEND_NAME = QWEN
+KOKORO_BACKEND_NAME = KOKORO
+
+# wavhost language strings -> Kokoro KPipeline lang_code (voice prefix letter).
+_KOKORO_LANG = {
+    "a": "a",
+    "b": "b",
+    "e": "e",
+    "f": "f",
+    "h": "h",
+    "i": "i",
+    "j": "j",
+    "p": "p",
+    "z": "z",
+    "en": "a",
+    "en-us": "a",
+    "english": "a",
+    "en-gb": "b",
+    "british": "b",
+    "es": "e",
+    "spanish": "e",
+    "fr": "f",
+    "fr-fr": "f",
+    "french": "f",
+    "hi": "h",
+    "hindi": "h",
+    "it": "i",
+    "italian": "i",
+    "ja": "j",
+    "jp": "j",
+    "japanese": "j",
+    "zh": "z",
+    "cn": "z",
+    "chinese": "z",
+    "mandarin": "z",
+    "pt": "p",
+    "pt-br": "p",
+    "portuguese": "p",
+}
 
 # PyPI chatterbox-tts 0.1.7 loads Turbo only. Nano (GPT2-small + t3_nano_v1)
 # landed on GitHub later; register the missing backbone until a release ships
@@ -53,10 +99,6 @@ _GPT2_SMALL_CONFIG = {
     },
     "vocab_size": 50276,
 }
-
-# Kept for older imports / tests.
-BACKEND_NAME = CHATTERBOX
-QWEN_BACKEND_NAME = QWEN
 
 
 def _from_local_kwargs(loader: Any, requested: dict[str, Any]) -> dict[str, Any]:
@@ -288,6 +330,7 @@ class ChatterboxBackend:
         # Accept either language or language_id from CLI/API.
         language = generate_kwargs.pop("language", None)
         language_id = generate_kwargs.pop("language_id", None) or language
+        generate_kwargs.pop("speed", None)
 
         ref = _ref_audio_path(voice, voice_handle, require=bool(voice or voice_handle))
         if ref:
@@ -400,6 +443,7 @@ class QwenBackend:
             opts["language"] = opts.pop("language_id")
         else:
             opts.pop("language_id", None)
+        opts.pop("speed", None)
 
         try:
             if self._task == "custom_voice":
@@ -454,6 +498,216 @@ class QwenBackend:
         return self._sr
 
 
+def _kokoro_lang_code(voice_name: str, language: Optional[str]) -> str:
+    """Map an ISO/name language string, or fall back to the voicepack prefix."""
+    if language:
+        key = language.strip().lower().replace("_", "-")
+        mapped = _KOKORO_LANG.get(key)
+        if mapped is None:
+            raise BackendError(
+                f"Unknown Kokoro language '{language}'. "
+                "Use a voice prefix (a, b, j, z, …) or ISO code (en, ja, zh, …)."
+            )
+        return mapped
+    return voice_name[0] if voice_name else "a"
+
+
+_KOKORO_ESPEAK_LANGS = frozenset("efhip")
+_KOKORO_MISAKI_EXTRAS = {"j": "misaki[ja]", "z": "misaki[zh]"}
+
+
+def _friendly_kokoro_error(exc: BaseException, lang_code: str) -> str:
+    """Turn G2P/espeak failures into an install hint instead of a stack dump."""
+    extra = _KOKORO_MISAKI_EXTRAS.get(lang_code)
+    if extra and isinstance(exc, ImportError):
+        return (
+            f"Kokoro language '{lang_code}' needs extra G2P packages.\n"
+            f"Install with: pip install '{extra}'"
+        )
+    text = f"{type(exc).__name__}: {exc}".lower()
+    if "espeak" in text or lang_code in _KOKORO_ESPEAK_LANGS:
+        return (
+            "Kokoro needs espeak-ng on PATH for Spanish, French, Hindi, "
+            "Italian, and Portuguese voices.\n"
+            "Install espeak-ng (https://github.com/espeak-ng/espeak-ng) "
+            "and ensure the espeak-ng binary is on PATH.\n"
+            "English voices (af_*, am_*, bf_*, bm_*) do not require it."
+        )
+    return f"Speech generation failed: {exc}"
+
+
+class KokoroBackend:
+    """Kokoro-82M: named voicepacks, local KModel + KPipeline, no Hub at runtime.
+
+    KModel is the 82M weights (language-blind). KPipeline is per-language G2P
+    plus voicepack lookup. Official voice loading hits Hugging Face; we preload
+    ``voices/<name>.pt`` from the checkpoint so synthesis stays offline.
+    """
+
+    def __init__(
+        self,
+        model_class: str,
+        checkpoint_path: Union[str, Path],
+        model_kwargs: Optional[dict] = None,
+        device: Optional[str] = None,
+    ):
+        self._model_kwargs = model_kwargs or {}
+        self._default_voice = self._model_kwargs.get(
+            "default_voice", KOKORO_DEFAULT_VOICE
+        )
+        self._checkpoint_path = _require_checkpoint(Path(checkpoint_path))
+        self._device = device or _detect_device()
+        self._model = None
+        self._pipelines: dict[str, Any] = {}
+        self._sr = DEFAULT_SAMPLE_RATE
+        logger.info(
+            f"Initialized Kokoro on {self._device} from {self._checkpoint_path}"
+        )
+
+    def _load_model(self) -> None:
+        if self._model is not None:
+            return
+        if not dependencies.is_installed(KOKORO):
+            raise BackendError(dependencies.missing_engine_message(KOKORO))
+
+        config = self._checkpoint_path / "config.json"
+        weights = self._checkpoint_path / "kokoro-v1_0.pth"
+        missing = [p.name for p in (config, weights) if not p.is_file()]
+        if missing:
+            raise BackendError(
+                f"Kokoro checkpoint is missing {', '.join(missing)} in "
+                f"{self._checkpoint_path}. Pull the model first with: wavhost pull kokoro"
+            )
+
+        logger.info(f"Loading KModel from {self._checkpoint_path}...")
+        try:
+            from kokoro import KModel
+
+            # repo_id only suppresses the library warning; weights come from disk.
+            self._model = (
+                KModel(
+                    repo_id=KOKORO_REPO,
+                    config=str(config),
+                    model=str(weights),
+                )
+                .to(self._device)
+                .eval()
+            )
+        except ImportError as e:
+            raise BackendError(
+                f"Failed to import Kokoro. "
+                f"Install with: {dependencies.install_hint(KOKORO)}\nError: {e}"
+            ) from e
+        except Exception as e:
+            logger.debug("Kokoro model load failed", exc_info=True)
+            raise BackendError(
+                f"Failed to load Kokoro model: {type(e).__name__}: {e}"
+            ) from e
+
+    def _pipeline(self, lang_code: str) -> Any:
+        self._load_model()
+        if lang_code not in self._pipelines:
+            try:
+                from kokoro import KPipeline
+
+                self._pipelines[lang_code] = KPipeline(
+                    lang_code=lang_code,
+                    repo_id=KOKORO_REPO,
+                    model=self._model,
+                    device=self._device,
+                )
+            except ImportError as e:
+                raise BackendError(_friendly_kokoro_error(e, lang_code)) from e
+            except Exception as e:
+                raise BackendError(_friendly_kokoro_error(e, lang_code)) from e
+        return self._pipelines[lang_code]
+
+    def _voice_name(
+        self, voice: Optional[str], voice_handle: Optional[Any]
+    ) -> str:
+        ref = _ref_audio_path(voice, voice_handle)
+        if ref:
+            raise BackendError(
+                "This Kokoro model uses named voices, not reference-audio cloning. "
+                "Pass a voice such as af_heart or bm_george."
+            )
+        if voice is None or voice.lower() in {"", "default"}:
+            return self._default_voice
+        key = voice.lower()
+        if key not in KOKORO_VOICES:
+            names = ", ".join(KOKORO_VOICES)
+            raise BackendError(f"Unknown Kokoro voice '{voice}'. Use one of: {names}")
+        return key
+
+    def _ensure_voice(self, pipeline: Any, name: str) -> None:
+        if name in getattr(pipeline, "voices", {}):
+            return
+        path = self._checkpoint_path / "voices" / f"{name}.pt"
+        if not path.is_file():
+            raise BackendError(
+                f"Kokoro voicepack not found: {path}. "
+                "Pull the model first with: wavhost pull kokoro"
+            )
+        try:
+            pipeline.voices[name] = torch.load(
+                path, map_location="cpu", weights_only=True
+            )
+        except Exception as e:
+            raise BackendError(f"Failed to load Kokoro voice '{name}': {e}") from e
+
+    @staticmethod
+    def _to_tensor(chunks: list[Any]) -> torch.Tensor:
+        wav = torch.cat(
+            [torch.as_tensor(c).float().reshape(-1) for c in chunks]
+        )
+        return wav.unsqueeze(0)
+
+    def generate(
+        self,
+        text: str,
+        voice: Optional[str] = None,
+        voice_handle: Optional[Any] = None,
+        **kwargs,
+    ) -> tuple[torch.Tensor, int]:
+        opts = kwargs.copy()
+        language = opts.pop("language", None)
+        if language is None and "language_id" in opts:
+            language = opts.pop("language_id")
+        else:
+            opts.pop("language_id", None)
+        opts.pop("speed", None)
+        split_pattern = opts.pop("split_pattern", r"\n+")
+
+        name = self._voice_name(voice, voice_handle)
+        lang_code = _kokoro_lang_code(name, language)
+        pipeline = self._pipeline(lang_code)
+        self._ensure_voice(pipeline, name)
+
+        try:
+            chunks: list[Any] = []
+            for result in pipeline(
+                text, voice=name, split_pattern=split_pattern
+            ):
+                audio = getattr(result, "audio", None)
+                if audio is None:
+                    continue
+                chunks.append(audio)
+            if not chunks:
+                raise BackendError("Kokoro produced no audio for this text")
+            return self._to_tensor(chunks), self._sr
+        except BackendError:
+            raise
+        except Exception as e:
+            raise BackendError(_friendly_kokoro_error(e, lang_code)) from e
+
+    def create_voice(self, ref_audio_path: str, **kwargs) -> dict[str, str]:
+        return _voice_handle(ref_audio_path)
+
+    @property
+    def sample_rate(self) -> int:
+        return self._sr
+
+
 def create_backend(
     model_info: ModelInfo,
     device: Optional[str] = None,
@@ -483,4 +737,6 @@ def create_backend(
         return ChatterboxBackend(**common)
     if model_info.backend == QWEN:
         return QwenBackend(**common)
+    if model_info.backend == KOKORO:
+        return KokoroBackend(**common)
     raise BackendError(f"Unsupported backend type: {model_info.backend}")

@@ -48,6 +48,6 @@ The site will automatically deploy when changes are pushed to the configured bra
 - **Copy buttons:** Every code block and command has a copy-to-clipboard control
 - **Docs layout:** Three-column shell with left sidebar, article, and right TOC
 
-Models documented: Chatterbox (MIT) and Qwen3-TTS CustomVoice / Base (Apache-2.0).
+Models documented: Chatterbox (MIT), Qwen3-TTS CustomVoice / Base, and Kokoro-82M (Apache-2.0).
 
 All GitHub links point to `https://github.com/smitgol/wavhost`.

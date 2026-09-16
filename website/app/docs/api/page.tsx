@@ -102,7 +102,19 @@ const LIST_MODELS_RESPONSE = `{
       "created": 0,
       "owned_by": "resemble",
       "installed": true,
-      "description": "Chatterbox Turbo - 350M parameter English TTS model (MIT License)"
+      "description": "Chatterbox Turbo - 350M parameter English TTS model (MIT License)",
+      "speakers": [],
+      "default_voice": null
+    },
+    {
+      "id": "kokoro",
+      "object": "model",
+      "created": 0,
+      "owned_by": "hexgrad",
+      "installed": true,
+      "description": "Kokoro-82M - lightweight multilingual TTS, 54 named voices (Apache-2.0)",
+      "speakers": ["af_heart", "bm_george"],
+      "default_voice": "af_heart"
     }
   ]
 }`;
@@ -189,12 +201,12 @@ export default function APIPage() {
                 Required. Text to synthesize (max 4096)
               </Param>
               <Param name="voice" type="string">
-                Optional. Saved voice, Qwen speaker (<code>Ryan</code>, …), path, or{" "}
-                <code>default</code>
+                Optional. Saved voice, named speaker (Qwen <code>Ryan</code>, Kokoro{" "}
+                <code>af_heart</code>, …), path, or <code>default</code>
               </Param>
               <Param name="language" type="string">
-                Optional. Chatterbox Multilingual ISO (<code>fr</code>, <code>zh</code>, …) or Qwen
-                language name
+                Optional. Chatterbox Multilingual ISO (<code>fr</code>, <code>zh</code>, …), Qwen
+                language name, or Kokoro ISO / voice prefix
               </Param>
               <Param name="response_format" type="string">
                 Optional. Default <code>mp3</code>. Also <code>wav</code>, <code>opus</code>,{" "}
@@ -202,7 +214,7 @@ export default function APIPage() {
                 <code>pcm_22050</code>, <code>pcm_24000</code>, <code>pcm_44100</code>
               </Param>
               <Param name="speed" type="float">
-                Optional 0.25–4.0 (not implemented yet)
+                Optional 0.25–4.0 (currently ignored)
               </Param>
               <Param name="stream" type="bool">
                 Optional. Default <code>false</code>. Progressive download; only <code>mp3</code>{" "}
@@ -315,7 +327,7 @@ export default function APIPage() {
             id="get-models"
             method="get"
             path="/v1/models"
-            description="List available models (OpenAI-shaped), including install status."
+            description="List available models (OpenAI-shaped), including install status, named speakers, and default voice."
           >
             <p className="docs-example-label">Example</p>
             <CodeBlock text={LIST_MODELS_CURL} label="Copy models" />
