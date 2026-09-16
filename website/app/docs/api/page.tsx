@@ -99,13 +99,58 @@ const CREATE_VOICE_CURL = `curl -X POST http://localhost:11435/v1/voices \\
 
 const LIST_VOICES_CURL = `curl http://localhost:11435/v1/voices`;
 
+const LIST_VOICES_RESPONSE = `{
+  "object": "list",
+  "data": [
+    {
+      "name": "narrator",
+      "description": "Professional narrator voice",
+      "backend": "chatterbox",
+      "ref_audio": {
+        "digest": "sha256-...",
+        "original_filename": "reference.wav",
+        "size": 1024000
+      }
+    }
+  ]
+}`;
+
 const GET_VOICE_CURL = `curl http://localhost:11435/v1/voices/narrator`;
+
+const GET_VOICE_RESPONSE = `{
+  "name": "narrator",
+  "description": "Professional narrator voice",
+  "backend": "chatterbox",
+  "ref_audio": {
+    "digest": "sha256-...",
+    "original_filename": "reference.wav",
+    "size": 1024000
+  }
+}`;
 
 const DELETE_VOICE_CURL = `curl -X DELETE http://localhost:11435/v1/voices/narrator`;
 
 const LIST_MODELS_CURL = `curl http://localhost:11435/v1/models`;
 
+const LIST_MODELS_RESPONSE = `{
+  "object": "list",
+  "data": [
+    {
+      "id": "chatterbox-turbo",
+      "object": "model",
+      "created": 0,
+      "owned_by": "resemble",
+      "installed": true,
+      "description": "Chatterbox Turbo - 350M parameter English TTS model (MIT License)"
+    }
+  ]
+}`;
+
 const HEALTH_CURL = `curl http://localhost:11435/health`;
+
+const HEALTH_RESPONSE = `{
+  "status": "ok"
+}`;
 
 const PYTHON_CLIENT = `from openai import OpenAI
 
@@ -262,6 +307,8 @@ export default function APIPage() {
           >
             <p className="docs-example-label">Example</p>
             <CodeBlock text={LIST_VOICES_CURL} label="Copy list voices" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={LIST_VOICES_RESPONSE} label="Copy list voices response" />
           </Endpoint>
 
           <Endpoint
@@ -278,6 +325,8 @@ export default function APIPage() {
             </ul>
             <p className="docs-example-label">Example</p>
             <CodeBlock text={GET_VOICE_CURL} label="Copy get voice" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={GET_VOICE_RESPONSE} label="Copy get voice response" />
           </Endpoint>
 
           <Endpoint
@@ -308,6 +357,8 @@ export default function APIPage() {
           >
             <p className="docs-example-label">Example</p>
             <CodeBlock text={LIST_MODELS_CURL} label="Copy models" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={LIST_MODELS_RESPONSE} label="Copy models response" />
           </Endpoint>
 
           <Endpoint
@@ -322,6 +373,8 @@ export default function APIPage() {
           >
             <p className="docs-example-label">Example</p>
             <CodeBlock text={HEALTH_CURL} label="Copy health" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={HEALTH_RESPONSE} label="Copy health response" />
           </Endpoint>
 
           <p className="docs-section-label" id="python">
