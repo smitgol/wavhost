@@ -1,12 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ChevronDownIcon } from "lucide-react";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type ApiEndpointProps = {
   id: string;
@@ -26,26 +26,20 @@ export function ApiEndpoint({
   defaultOpen = false,
 }: ApiEndpointProps) {
   return (
-    <Accordion
-      type="single"
-      collapsible
-      defaultValue={defaultOpen ? id : undefined}
-      className="endpoint-accordion"
-    >
-      <AccordionItem value={id} className="endpoint border-0" id={id}>
-        <AccordionTrigger className="endpoint-head hover:no-underline">
-          <span className="endpoint-head-lead">
-            <span className={`method method-${method}`}>{method.toUpperCase()}</span>
-            <code className="endpoint-path">{path}</code>
-          </span>
-        </AccordionTrigger>
-        <AccordionContent className="endpoint-body-wrap">
-          <div className="endpoint-body">
-            <p className="endpoint-desc">{description}</p>
-            {children}
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
+    <Collapsible id={id} defaultOpen={defaultOpen} className="endpoint">
+      <CollapsibleTrigger className="endpoint-head">
+        <span className="endpoint-head-lead">
+          <span className={`method method-${method}`}>{method.toUpperCase()}</span>
+          <code className="endpoint-path">{path}</code>
+        </span>
+        <ChevronDownIcon className="endpoint-chevron size-4 shrink-0" aria-hidden />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="endpoint-body-wrap">
+        <div className="endpoint-body">
+          <p className="endpoint-desc">{description}</p>
+          {children}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

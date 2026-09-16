@@ -1530,30 +1530,36 @@ code {
   overflow: hidden;
 }
 
-.endpoint-accordion {
-  width: 100%;
-}
-
-.endpoint-accordion .endpoint {
-  border: 1px solid var(--line);
-}
-
 .endpoint-head {
   display: flex;
-  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.55rem 0.75rem;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: 100%;
-  padding: 0.75rem 0.95rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
   margin: 0;
+  border: 0;
   border-radius: 0;
   border-bottom: 1px solid transparent;
   background: var(--surface);
   color: var(--ink);
+  font: inherit;
   font-weight: 500;
+  cursor: pointer;
+  text-align: left;
 }
 
-.endpoint-accordion [data-state="open"] > .endpoint-head {
+.endpoint-head:hover {
+  background: color-mix(in srgb, var(--surface) 70%, var(--chip));
+}
+
+.endpoint-head:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.endpoint[data-state="open"] > .endpoint-head {
   border-bottom-color: var(--line);
 }
 
@@ -1561,19 +1567,26 @@ code {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.55rem 0.75rem;
+  gap: 0.5rem 0.7rem;
   min-width: 0;
   flex: 1;
-  text-align: left;
+}
+
+.endpoint-chevron {
+  color: var(--faint);
+  transition: transform 0.2s ease;
+}
+
+.endpoint[data-state="open"] .endpoint-chevron {
+  transform: rotate(180deg);
 }
 
 .endpoint-body-wrap {
-  padding: 0;
+  overflow: hidden;
 }
 
-.endpoint-body-wrap > div {
-  padding: 0;
-  height: auto;
+.endpoint-body-wrap[data-state="closed"] {
+  display: none;
 }
 
 .endpoint-body {
