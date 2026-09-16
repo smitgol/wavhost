@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Navigation } from "@/components/Navigation";
 import { DocsLayout } from "@/components/DocsLayout";
-import { CopyButton } from "@/components/CopyButton";
+import { CodeSnippet } from "@/components/CodeSnippet";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -28,17 +28,6 @@ function Param({
       </div>
       <p className="docs-param-desc">{children}</p>
     </li>
-  );
-}
-
-function CodeBlock({ text, label }: { text: string; label: string }) {
-  return (
-    <div className="code-wrap">
-      <CopyButton text={text} className="copy-btn copy-btn--block" label={label} />
-      <pre className="code docs-code">
-        <code data-copy>{text}</code>
-      </pre>
-    </div>
   );
 }
 
@@ -262,11 +251,18 @@ export default function APIPage() {
               </p>
             </div>
 
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={SPEECH_CURL} label="Copy speech curl" />
+            <CodeSnippet
+              title="Example"
+              text={SPEECH_CURL}
+              label="Copy speech curl"
+              defaultOpen
+            />
 
-            <p className="docs-example-label">Streaming</p>
-            <CodeBlock text={STREAM_CURL} label="Copy streaming curl" />
+            <CodeSnippet
+              title="Streaming"
+              text={STREAM_CURL}
+              label="Copy streaming curl"
+            />
           </Endpoint>
 
           <p className="docs-section-label" id="voices">
@@ -295,8 +291,12 @@ export default function APIPage() {
                 Optional. Short description
               </Param>
             </ul>
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={CREATE_VOICE_CURL} label="Copy create voice" />
+            <CodeSnippet
+              title="Example"
+              text={CREATE_VOICE_CURL}
+              label="Copy create voice"
+              defaultOpen
+            />
           </Endpoint>
 
           <Endpoint
@@ -305,10 +305,17 @@ export default function APIPage() {
             path="/v1/voices"
             description="List all saved voices in the local library."
           >
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={LIST_VOICES_CURL} label="Copy list voices" />
-            <p className="docs-example-label">Response</p>
-            <CodeBlock text={LIST_VOICES_RESPONSE} label="Copy list voices response" />
+            <CodeSnippet
+              title="Example"
+              text={LIST_VOICES_CURL}
+              label="Copy list voices"
+              defaultOpen
+            />
+            <CodeSnippet
+              title="Response"
+              text={LIST_VOICES_RESPONSE}
+              label="Copy list voices response"
+            />
           </Endpoint>
 
           <Endpoint
@@ -323,10 +330,17 @@ export default function APIPage() {
                 Required. Voice name
               </Param>
             </ul>
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={GET_VOICE_CURL} label="Copy get voice" />
-            <p className="docs-example-label">Response</p>
-            <CodeBlock text={GET_VOICE_RESPONSE} label="Copy get voice response" />
+            <CodeSnippet
+              title="Example"
+              text={GET_VOICE_CURL}
+              label="Copy get voice"
+              defaultOpen
+            />
+            <CodeSnippet
+              title="Response"
+              text={GET_VOICE_RESPONSE}
+              label="Copy get voice response"
+            />
           </Endpoint>
 
           <Endpoint
@@ -341,8 +355,12 @@ export default function APIPage() {
                 Required. Voice name
               </Param>
             </ul>
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={DELETE_VOICE_CURL} label="Copy delete voice" />
+            <CodeSnippet
+              title="Example"
+              text={DELETE_VOICE_CURL}
+              label="Copy delete voice"
+              defaultOpen
+            />
           </Endpoint>
 
           <p className="docs-section-label" id="models-health">
@@ -355,10 +373,17 @@ export default function APIPage() {
             path="/v1/models"
             description="List available models (OpenAI-shaped), including install status."
           >
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={LIST_MODELS_CURL} label="Copy models" />
-            <p className="docs-example-label">Response</p>
-            <CodeBlock text={LIST_MODELS_RESPONSE} label="Copy models response" />
+            <CodeSnippet
+              title="Example"
+              text={LIST_MODELS_CURL}
+              label="Copy models"
+              defaultOpen
+            />
+            <CodeSnippet
+              title="Response"
+              text={LIST_MODELS_RESPONSE}
+              label="Copy models response"
+            />
           </Endpoint>
 
           <Endpoint
@@ -371,16 +396,28 @@ export default function APIPage() {
               </>
             }
           >
-            <p className="docs-example-label">Example</p>
-            <CodeBlock text={HEALTH_CURL} label="Copy health" />
-            <p className="docs-example-label">Response</p>
-            <CodeBlock text={HEALTH_RESPONSE} label="Copy health response" />
+            <CodeSnippet
+              title="Example"
+              text={HEALTH_CURL}
+              label="Copy health"
+              defaultOpen
+            />
+            <CodeSnippet
+              title="Response"
+              text={HEALTH_RESPONSE}
+              label="Copy health response"
+            />
           </Endpoint>
 
           <p className="docs-section-label" id="python">
             Python client
           </p>
-          <CodeBlock text={PYTHON_CLIENT} label="Copy Python" />
+          <CodeSnippet
+            title="Example"
+            text={PYTHON_CLIENT}
+            label="Copy Python"
+            defaultOpen
+          />
         </div>
 
         <nav className="docs-pager" aria-label="Pagination">
