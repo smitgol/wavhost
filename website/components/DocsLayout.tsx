@@ -5,9 +5,18 @@ interface DocsLayoutProps {
   breadcrumb: string;
   currentPath: string;
   toc?: Array<{ id: string; label: string }>;
+  articleClassName?: string;
 }
 
-export function DocsLayout({ children, breadcrumb, currentPath, toc }: DocsLayoutProps) {
+export function DocsLayout({
+  children,
+  breadcrumb,
+  currentPath,
+  toc,
+  articleClassName,
+}: DocsLayoutProps) {
+  const articleClass = ["docs-article", articleClassName].filter(Boolean).join(" ");
+
   return (
     <>
       <div className="docs-mobile-nav">
@@ -57,29 +66,29 @@ export function DocsLayout({ children, breadcrumb, currentPath, toc }: DocsLayou
           </ul>
         </aside>
 
-      <div className="docs-main-col">
-        <main id="main" className="docs-article">
-          <nav className="docs-crumb" aria-label="Breadcrumb">
-            <Link href="/docs">Docs</Link>
-            <span aria-hidden="true">/</span>
-            <span>{breadcrumb}</span>
-          </nav>
-          {children}
-        </main>
+        <div className="docs-main-col">
+          <main id="main" className={articleClass}>
+            <nav className="docs-crumb" aria-label="Breadcrumb">
+              <Link href="/docs">Docs</Link>
+              <span aria-hidden="true">/</span>
+              <span>{breadcrumb}</span>
+            </nav>
+            {children}
+          </main>
 
-        {toc && toc.length > 0 && (
-          <aside className="docs-toc" aria-label="On this page">
-            <p className="docs-toc-title">On this page</p>
-            <ul>
-              {toc.map((item) => (
-                <li key={item.id}>
-                  <a href={`#${item.id}`}>{item.label}</a>
-                </li>
-              ))}
-            </ul>
-          </aside>
-        )}
-      </div>
+          {toc && toc.length > 0 && (
+            <aside className="docs-toc" aria-label="On this page">
+              <p className="docs-toc-title">On this page</p>
+              <ul>
+                {toc.map((item) => (
+                  <li key={item.id}>
+                    <a href={`#${item.id}`}>{item.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )}
+        </div>
       </div>
     </>
   );

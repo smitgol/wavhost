@@ -3,13 +3,15 @@
 import tempfile
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Iterator, Literal, Optional
 
 import torch
 import torchaudio
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from wavhost.audio import encode_wav
 from wavhost.backends import create_backend
 from wavhost.config import MAX_INPUT_LENGTH, MAX_SPEED, MIN_SPEED, VERSION
 from wavhost.exceptions import (
@@ -66,6 +68,32 @@ PCM_SAMPLE_RATES: dict[AudioFormat, int] = {
     AudioFormat.PCM_44100: 44100,
 }
 
+# Formats allowed when stream=true (mp3 + pcm family; not wav/opus/aac/flac).
+STREAMABLE_FORMATS: frozenset[AudioFormat] = frozenset(
+    {
+        AudioFormat.MP3,
+        AudioFormat.PCM,
+        AudioFormat.PCM_16000,
+        AudioFormat.PCM_22050,
+        AudioFormat.PCM_24000,
+        AudioFormat.PCM_44100,
+    }
+)
+
+# Fixed chunk size for progressive download (8 KiB).
+STREAM_CHUNK_SIZE: int = 8192
+
+
+def iter_audio_chunks(
+    data: bytes,
+    chunk_size: int = STREAM_CHUNK_SIZE,
+) -> Iterator[bytes]:
+    """Yield fixed-size slices of audio bytes for StreamingResponse."""
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    for i in range(0, len(data), chunk_size):
+        yield data[i : i + chunk_size]
+
 
 class SpeechRequest(BaseModel):
     """Request model for /v1/audio/speech endpoint (OpenAI-compatible)."""
@@ -100,7 +128,8 @@ class SpeechRequest(BaseModel):
         default=AudioFormat.MP3,
         description=(
             "Audio format for the output. PCM options: pcm (native rate S16LE), "
-            "pcm_16000, pcm_22050, pcm_24000, pcm_44100"
+            "pcm_16000, pcm_22050, pcm_24000, pcm_44100. When stream=true, only "
+            "mp3 and pcm/pcm_* are allowed."
         ),
     )
     speed: float = Field(
@@ -108,6 +137,13 @@ class SpeechRequest(BaseModel):
         ge=MIN_SPEED,
         le=MAX_SPEED,
         description="Speed of the audio (currently not implemented)"
+    )
+    stream: bool = Field(
+        default=False,
+        description=(
+            "If true, return audio as a progressive download (chunked bytes). "
+            "Only mp3 and pcm/pcm_* formats are supported."
+        ),
     )
 
 
@@ -217,6 +253,17 @@ class AudioConverter:
             resampled = cls.resample(audio_tensor, sample_rate, target_rate)
             return cls.to_pcm16_bytes(resampled)
 
+        # torchaudio.save() requires TorchCodec since 2.9. WAV is just a
+        # header around S16LE PCM, so encode it without that extra dependency.
+        if target_format == AudioFormat.WAV:
+            try:
+                return encode_wav(audio_tensor, sample_rate)
+            except Exception as e:
+                logger.error(f"Audio conversion failed: {e}")
+                raise RuntimeError(
+                    f"Failed to convert audio to {target_format.value}: {e}"
+                ) from e
+
         with tempfile.NamedTemporaryFile(
             suffix=f".{target_format.value}",
             delete=False,
@@ -228,13 +275,6 @@ class AudioConverter:
 
             if target_format == AudioFormat.OPUS:
                 save_kwargs["bits_per_sample"] = 16
-            elif target_format == AudioFormat.WAV:
-                # Avoid float32 WAV — many players decode it incorrectly.
-                save_kwargs["encoding"] = "PCM_S"
-                save_kwargs["bits_per_sample"] = 16
-                audio_tensor = (
-                    audio_tensor.detach().float().cpu().clamp(-1.0, 1.0)
-                )
 
             torchaudio.save(
                 str(tmp_path),
@@ -339,6 +379,10 @@ async def create_speech(request: SpeechRequest):
     
     Compatible with OpenAI's /v1/audio/speech API.
     
+    When ``stream=true``, returns chunked audio bytes (progressive download).
+    Streaming supports ``mp3`` and ``pcm`` / ``pcm_*`` only. For ``pcm``, the
+    sample rate is the model's native rate; Content-Type is ``audio/pcm``.
+    
     Example:
         curl http://localhost:11435/v1/audio/speech \\
           -H "Content-Type: application/json" \\
@@ -346,6 +390,16 @@ async def create_speech(request: SpeechRequest):
           --output speech.mp3
     """
     try:
+        if request.stream and request.response_format not in STREAMABLE_FORMATS:
+            allowed = ", ".join(sorted(f.value for f in STREAMABLE_FORMATS))
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"stream=true only supports response_format "
+                    f"in [{allowed}]; got '{request.response_format.value}'"
+                ),
+            )
+
         storage = WavhostStorage()
         registry = ModelRegistry()
         voice_storage = VoiceStorage()
@@ -373,15 +427,23 @@ async def create_speech(request: SpeechRequest):
         audio_bytes = AudioConverter.convert(wav, sr, request.response_format)
         media_type = AudioConverter.get_media_type(request.response_format)
         filename = AudioConverter.get_filename(request.response_format)
+        disposition = f"attachment; filename={filename}"
+
+        if request.stream:
+            return StreamingResponse(
+                iter_audio_chunks(audio_bytes),
+                media_type=media_type,
+                headers={"Content-Disposition": disposition},
+            )
 
         return Response(
             content=audio_bytes,
             media_type=media_type,
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            },
+            headers={"Content-Disposition": disposition},
         )
         
+    except HTTPException:
+        raise
     except ModelNotFoundError as e:
         logger.warning(f"Model not found: {e.model_name}")
         raise HTTPException(

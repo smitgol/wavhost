@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Navigation } from "@/components/Navigation";
 import { DocsLayout } from "@/components/DocsLayout";
-import { CopyButton } from "@/components/CopyButton";
+import { ApiEndpoint } from "@/components/ApiEndpoint";
+import { CodeBlock } from "@/components/CodeBlock";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -9,6 +11,121 @@ export const metadata: Metadata = {
   description:
     "Wavhost API reference — speech, voices, models, health. OpenAI-compatible local server.",
 };
+
+function Param({
+  name,
+  type,
+  children,
+}: {
+  name: string;
+  type: string;
+  children: ReactNode;
+}) {
+  return (
+    <li className="docs-param">
+      <div className="docs-param-name">
+        <code>{name}</code>
+        <span className="docs-param-type">{type}</span>
+      </div>
+      <p className="docs-param-desc">{children}</p>
+    </li>
+  );
+}
+
+const SPEECH_CURL = `curl http://localhost:11435/v1/audio/speech \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "chatterbox-turbo",
+    "input": "Hello from Wavhost!",
+    "voice": "my-voice",
+    "response_format": "mp3"
+  }' \\
+  --output speech.mp3`;
+
+const STREAM_CURL = `curl http://127.0.0.1:11435/v1/audio/speech \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "chatterbox-nano",
+    "input": "Hello",
+    "voice": "default",
+    "stream": true,
+    "response_format": "pcm"
+  }' \\
+  --output out.pcm`;
+
+const CREATE_VOICE_CURL = `curl -X POST http://localhost:11435/v1/voices \\
+  -F "name=narrator" \\
+  -F "file=@reference.wav" \\
+  -F "description=Professional narrator voice"`;
+
+const LIST_VOICES_CURL = `curl http://localhost:11435/v1/voices`;
+
+const LIST_VOICES_RESPONSE = `{
+  "object": "list",
+  "data": [
+    {
+      "name": "narrator",
+      "description": "Professional narrator voice",
+      "backend": "chatterbox",
+      "ref_audio": {
+        "digest": "sha256-...",
+        "original_filename": "reference.wav",
+        "size": 1024000
+      }
+    }
+  ]
+}`;
+
+const GET_VOICE_CURL = `curl http://localhost:11435/v1/voices/narrator`;
+
+const GET_VOICE_RESPONSE = `{
+  "name": "narrator",
+  "description": "Professional narrator voice",
+  "backend": "chatterbox",
+  "ref_audio": {
+    "digest": "sha256-...",
+    "original_filename": "reference.wav",
+    "size": 1024000
+  }
+}`;
+
+const DELETE_VOICE_CURL = `curl -X DELETE http://localhost:11435/v1/voices/narrator`;
+
+const LIST_MODELS_CURL = `curl http://localhost:11435/v1/models`;
+
+const LIST_MODELS_RESPONSE = `{
+  "object": "list",
+  "data": [
+    {
+      "id": "chatterbox-turbo",
+      "object": "model",
+      "created": 0,
+      "owned_by": "resemble",
+      "installed": true,
+      "description": "Chatterbox Turbo - 350M parameter English TTS model (MIT License)"
+    }
+  ]
+}`;
+
+const HEALTH_CURL = `curl http://localhost:11435/health`;
+
+const HEALTH_RESPONSE = `{
+  "status": "ok"
+}`;
+
+const PYTHON_CLIENT = `from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:11435/v1",
+    api_key="not-needed",
+)
+
+speech = client.audio.speech.create(
+    model="chatterbox-turbo",
+    voice="my-voice",
+    input="Hello from Wavhost!",
+)
+speech.write_to_file("hello.mp3")`;
 
 export default function APIPage() {
   const toc = [
@@ -26,311 +143,207 @@ export default function APIPage() {
 
       <Navigation currentPath="/docs/api" variant="docs" />
 
-      <DocsLayout breadcrumb="API" currentPath="/docs/api" toc={toc}>
-        <h1>API reference</h1>
-        <p className="docs-intro">
-          Local OpenAI-compatible server. Base URL <code>http://localhost:11435</code>. No API key
-          required.
+      <DocsLayout
+        breadcrumb="API"
+        currentPath="/docs/api"
+        toc={toc}
+        articleClassName="docs-article--catalog"
+      >
+        <p className="docs-kicker">Reference</p>
+        <h1>API</h1>
+        <p className="docs-lede">
+          Local OpenAI-compatible server at <code>http://localhost:11435</code>. No API key
+          required. Binary audio responses; progressive download when{" "}
+          <code>stream: true</code>.
         </p>
+        <nav className="docs-jump" aria-label="On this page">
+          <a href="#speech">Speech</a>
+          <a href="#voices">Voices</a>
+          <a href="#models-health">Models &amp; health</a>
+          <a href="#python">Python</a>
+        </nav>
 
-        <h2 id="speech">Speech</h2>
-
-        <article className="endpoint" id="post-speech">
-          <header className="endpoint-head">
-            <span className="method method-post">POST</span>
-            <code className="endpoint-path">/v1/audio/speech</code>
-          </header>
-          <p>Generate speech from text (OpenAI-compatible). Response is binary audio.</p>
-          <div className="code-wrap">
-            <CopyButton
-              text={`curl http://localhost:11435/v1/audio/speech \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "chatterbox-turbo",
-    "input": "Hello from Wavhost!",
-    "voice": "my-voice",
-    "response_format": "mp3"
-  }' \\
-  --output speech.mp3`}
-              className="copy-btn copy-btn--block"
-              label="Copy speech curl"
-            />
-            <pre className="code">
-              <code data-copy>
-                {`curl http://localhost:11435/v1/audio/speech \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "chatterbox-turbo",
-    "input": "Hello from Wavhost!",
-    "voice": "my-voice",
-    "response_format": "mp3"
-  }' \\
-  --output speech.mp3`}
-              </code>
-            </pre>
-          </div>
-          <table className="docs-table">
-            <thead>
-              <tr>
-                <th>Body</th>
-                <th>Type</th>
-                <th>Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  <code>model</code>
-                </td>
-                <td>string</td>
-                <td>
-                  Required. e.g. <code>chatterbox-turbo</code>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <code>input</code>
-                </td>
-                <td>string</td>
-                <td>Required. Text to synthesize (max 4096)</td>
-              </tr>
-              <tr>
-                <td>
-                  <code>voice</code>
-                </td>
-                <td>string</td>
-                <td>
-                  Optional. Saved voice, Qwen speaker (<code>Ryan</code>, …), path, or{" "}
-                  <code>default</code>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <code>language</code>
-                </td>
-                <td>
-                  Optional. Chatterbox Multilingual ISO code (<code>fr</code>,{" "}
-                  <code>zh</code>, …) or Qwen language name
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <code>response_format</code>
-                </td>
-                <td>string</td>
-                <td>
-                  Optional. Default <code>mp3</code>. Also <code>wav</code>, <code>opus</code>,{" "}
-                  <code>flac</code>, <code>aac</code>, <code>pcm</code>, <code>pcm_16000</code>,{" "}
-                  <code>pcm_22050</code>, <code>pcm_24000</code>, <code>pcm_44100</code>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <code>speed</code>
-                </td>
-                <td>float</td>
-                <td>Optional 0.25–4.0 (not implemented yet)</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="docs-note">
-            Errors: <code>400</code> unknown voice / bad params · <code>404</code> model not found
-            · <code>500</code> generation failed.
+        <div className="docs-stack">
+          <p className="docs-section-label" id="speech">
+            Speech
           </p>
-        </article>
 
-        <h2 id="voices">Voices</h2>
+          <ApiEndpoint
+            id="post-speech"
+            method="post"
+            path="/v1/audio/speech"
+            defaultOpen
+            description={
+              <>
+                Generate speech from text. Response is binary audio (
+                <code>audio/mpeg</code>, <code>audio/pcm</code>, …).
+              </>
+            }
+          >
+            <p className="docs-example-label">Body</p>
+            <ul className="docs-param-list">
+              <Param name="model" type="string">
+                Required. e.g. <code>chatterbox-turbo</code>
+              </Param>
+              <Param name="input" type="string">
+                Required. Text to synthesize (max 4096)
+              </Param>
+              <Param name="voice" type="string">
+                Optional. Saved voice, Qwen speaker (<code>Ryan</code>, …), path, or{" "}
+                <code>default</code>
+              </Param>
+              <Param name="language" type="string">
+                Optional. Chatterbox Multilingual ISO (<code>fr</code>, <code>zh</code>, …) or Qwen
+                language name
+              </Param>
+              <Param name="response_format" type="string">
+                Optional. Default <code>mp3</code>. Also <code>wav</code>, <code>opus</code>,{" "}
+                <code>flac</code>, <code>aac</code>, <code>pcm</code>, <code>pcm_16000</code>,{" "}
+                <code>pcm_22050</code>, <code>pcm_24000</code>, <code>pcm_44100</code>
+              </Param>
+              <Param name="speed" type="float">
+                Optional 0.25–4.0 (not implemented yet)
+              </Param>
+              <Param name="stream" type="bool">
+                Optional. Default <code>false</code>. Progressive download; only <code>mp3</code>{" "}
+                and <code>pcm</code> / <code>pcm_*</code>
+              </Param>
+            </ul>
 
-        <article className="endpoint" id="post-voices">
-          <header className="endpoint-head">
-            <span className="method method-post">POST</span>
-            <code className="endpoint-path">/v1/voices</code>
-          </header>
-          <p>
-            Create a voice from reference audio (<code>multipart/form-data</code>).
+            <div className="model-note">
+              <p>
+                <strong>Streaming</strong> — <code>stream: true</code> returns chunked bytes.
+                Allowed: <code>mp3</code>, <code>pcm</code>, <code>pcm_*</code>. Rejected with{" "}
+                <code>400</code>: <code>wav</code>, <code>opus</code>, <code>aac</code>,{" "}
+                <code>flac</code>. For <code>pcm</code>, Content-Type is <code>audio/pcm</code> at
+                the model&apos;s native sample rate.
+              </p>
+              <p>
+                Errors: <code>400</code> bad params / unsupported stream format · <code>404</code>{" "}
+                model not found · <code>500</code> generation failed.
+              </p>
+            </div>
+
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={SPEECH_CURL} label="Copy speech curl" />
+
+            <p className="docs-example-label">Streaming</p>
+            <CodeBlock text={STREAM_CURL} label="Copy streaming curl" />
+          </ApiEndpoint>
+
+          <p className="docs-section-label" id="voices">
+            Voices
           </p>
-          <div className="code-wrap">
-            <CopyButton
-              text={`curl -X POST http://localhost:11435/v1/voices \\
-  -F "name=narrator" \\
-  -F "file=@reference.wav" \\
-  -F "description=Professional narrator voice"`}
-              className="copy-btn copy-btn--block"
-              label="Copy create voice"
-            />
-            <pre className="code">
-              <code data-copy>
-                {`curl -X POST http://localhost:11435/v1/voices \\
-  -F "name=narrator" \\
-  -F "file=@reference.wav" \\
-  -F "description=Professional narrator voice"`}
-              </code>
-            </pre>
-          </div>
-          <table className="docs-table">
-            <thead>
-              <tr>
-                <th>Field</th>
-                <th>Required</th>
-                <th>Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>
-                  <code>name</code>
-                </td>
-                <td>yes</td>
-                <td>Voice name</td>
-              </tr>
-              <tr>
-                <td>
-                  <code>file</code>
-                </td>
-                <td>yes</td>
-                <td>Reference audio file</td>
-              </tr>
-              <tr>
-                <td>
-                  <code>description</code>
-                </td>
-                <td>no</td>
-                <td>Short description</td>
-              </tr>
-            </tbody>
-          </table>
-        </article>
 
-        <article className="endpoint" id="get-voices">
-          <header className="endpoint-head">
-            <span className="method method-get">GET</span>
-            <code className="endpoint-path">/v1/voices</code>
-          </header>
-          <p>List saved voices.</p>
-          <div className="code-wrap">
-            <CopyButton
-              text="curl http://localhost:11435/v1/voices"
-              className="copy-btn copy-btn--block"
-              label="Copy list voices"
-            />
-            <pre className="code">
-              <code data-copy>curl http://localhost:11435/v1/voices</code>
-            </pre>
-          </div>
-        </article>
+          <ApiEndpoint
+            id="post-voices"
+            method="post"
+            path="/v1/voices"
+            description={
+              <>
+                Create a voice from reference audio (<code>multipart/form-data</code>).
+              </>
+            }
+          >
+            <p className="docs-example-label">Body</p>
+            <ul className="docs-param-list">
+              <Param name="name" type="string">
+                Required. Voice name
+              </Param>
+              <Param name="file" type="file">
+                Required. Reference audio file
+              </Param>
+              <Param name="description" type="string">
+                Optional. Short description
+              </Param>
+            </ul>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={CREATE_VOICE_CURL} label="Copy create voice" />
+          </ApiEndpoint>
 
-        <article className="endpoint" id="get-voice">
-          <header className="endpoint-head">
-            <span className="method method-get">GET</span>
-            <code className="endpoint-path">/v1/voices/{"{name}"}</code>
-          </header>
-          <p>Get one voice&apos;s details.</p>
-          <div className="code-wrap">
-            <CopyButton
-              text="curl http://localhost:11435/v1/voices/narrator"
-              className="copy-btn copy-btn--block"
-              label="Copy get voice"
-            />
-            <pre className="code">
-              <code data-copy>curl http://localhost:11435/v1/voices/narrator</code>
-            </pre>
-          </div>
-        </article>
+          <ApiEndpoint
+            id="get-voices"
+            method="get"
+            path="/v1/voices"
+            description="List all saved voices in the local library."
+          >
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={LIST_VOICES_CURL} label="Copy list voices" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={LIST_VOICES_RESPONSE} label="Copy list voices response" />
+          </ApiEndpoint>
 
-        <article className="endpoint" id="delete-voice">
-          <header className="endpoint-head">
-            <span className="method method-delete">DELETE</span>
-            <code className="endpoint-path">/v1/voices/{"{name}"}</code>
-          </header>
-          <p>Delete a saved voice.</p>
-          <div className="code-wrap">
-            <CopyButton
-              text="curl -X DELETE http://localhost:11435/v1/voices/narrator"
-              className="copy-btn copy-btn--block"
-              label="Copy delete voice"
-            />
-            <pre className="code">
-              <code data-copy>curl -X DELETE http://localhost:11435/v1/voices/narrator</code>
-            </pre>
-          </div>
-        </article>
+          <ApiEndpoint
+            id="get-voice"
+            method="get"
+            path="/v1/voices/{name}"
+            description="Get details for one saved voice."
+          >
+            <p className="docs-example-label">Path</p>
+            <ul className="docs-param-list">
+              <Param name="name" type="string">
+                Required. Voice name
+              </Param>
+            </ul>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={GET_VOICE_CURL} label="Copy get voice" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={GET_VOICE_RESPONSE} label="Copy get voice response" />
+          </ApiEndpoint>
 
-        <h2 id="models-health">Models &amp; health</h2>
+          <ApiEndpoint
+            id="delete-voice"
+            method="delete"
+            path="/v1/voices/{name}"
+            description="Delete a saved voice and clean up unused reference audio."
+          >
+            <p className="docs-example-label">Path</p>
+            <ul className="docs-param-list">
+              <Param name="name" type="string">
+                Required. Voice name
+              </Param>
+            </ul>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={DELETE_VOICE_CURL} label="Copy delete voice" />
+          </ApiEndpoint>
 
-        <article className="endpoint" id="get-models">
-          <header className="endpoint-head">
-            <span className="method method-get">GET</span>
-            <code className="endpoint-path">/v1/models</code>
-          </header>
-          <p>List models (OpenAI-shaped).</p>
-          <div className="code-wrap">
-            <CopyButton
-              text="curl http://localhost:11435/v1/models"
-              className="copy-btn copy-btn--block"
-              label="Copy models"
-            />
-            <pre className="code">
-              <code data-copy>curl http://localhost:11435/v1/models</code>
-            </pre>
-          </div>
-        </article>
-
-        <article className="endpoint" id="get-health">
-          <header className="endpoint-head">
-            <span className="method method-get">GET</span>
-            <code className="endpoint-path">/health</code>
-          </header>
-          <p>
-            Health check. Returns <code>{`{"status":"ok"}`}</code>.
+          <p className="docs-section-label" id="models-health">
+            Models &amp; health
           </p>
-          <div className="code-wrap">
-            <CopyButton
-              text="curl http://localhost:11435/health"
-              className="copy-btn copy-btn--block"
-              label="Copy health"
-            />
-            <pre className="code">
-              <code data-copy>curl http://localhost:11435/health</code>
-            </pre>
-          </div>
-        </article>
 
-        <h2 id="python">Python client</h2>
-        <div className="code-wrap">
-          <CopyButton
-            text={`from openai import OpenAI
+          <ApiEndpoint
+            id="get-models"
+            method="get"
+            path="/v1/models"
+            description="List available models (OpenAI-shaped), including install status."
+          >
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={LIST_MODELS_CURL} label="Copy models" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={LIST_MODELS_RESPONSE} label="Copy models response" />
+          </ApiEndpoint>
 
-client = OpenAI(
-    base_url="http://localhost:11435/v1",
-    api_key="not-needed",
-)
+          <ApiEndpoint
+            id="get-health"
+            method="get"
+            path="/health"
+            description={
+              <>
+                Health check. Returns <code>{`{"status":"ok"}`}</code>.
+              </>
+            }
+          >
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={HEALTH_CURL} label="Copy health" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={HEALTH_RESPONSE} label="Copy health response" />
+          </ApiEndpoint>
 
-speech = client.audio.speech.create(
-    model="chatterbox-turbo",
-    voice="my-voice",
-    input="Hello from Wavhost!",
-)
-speech.write_to_file("hello.mp3")`}
-            className="copy-btn copy-btn--block"
-            label="Copy Python"
-          />
-          <pre className="code">
-            <code data-copy>
-              {`from openai import OpenAI
-
-client = OpenAI(
-    base_url="http://localhost:11435/v1",
-    api_key="not-needed",
-)
-
-speech = client.audio.speech.create(
-    model="chatterbox-turbo",
-    voice="my-voice",
-    input="Hello from Wavhost!",
-)
-speech.write_to_file("hello.mp3")`}
-            </code>
-          </pre>
+          <p className="docs-section-label" id="python">
+            Python client
+          </p>
+          <p className="docs-example-label">Example</p>
+          <CodeBlock text={PYTHON_CLIENT} label="Copy Python" />
         </div>
 
         <nav className="docs-pager" aria-label="Pagination">
