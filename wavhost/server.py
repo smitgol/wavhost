@@ -11,6 +11,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from wavhost.audio import encode_wav
 from wavhost.backends import create_backend
 from wavhost.config import MAX_INPUT_LENGTH, MAX_SPEED, MIN_SPEED, VERSION
 from wavhost.exceptions import (
@@ -252,6 +253,17 @@ class AudioConverter:
             resampled = cls.resample(audio_tensor, sample_rate, target_rate)
             return cls.to_pcm16_bytes(resampled)
 
+        # torchaudio.save() requires TorchCodec since 2.9. WAV is just a
+        # header around S16LE PCM, so encode it without that extra dependency.
+        if target_format == AudioFormat.WAV:
+            try:
+                return encode_wav(audio_tensor, sample_rate)
+            except Exception as e:
+                logger.error(f"Audio conversion failed: {e}")
+                raise RuntimeError(
+                    f"Failed to convert audio to {target_format.value}: {e}"
+                ) from e
+
         with tempfile.NamedTemporaryFile(
             suffix=f".{target_format.value}",
             delete=False,
@@ -263,13 +275,6 @@ class AudioConverter:
 
             if target_format == AudioFormat.OPUS:
                 save_kwargs["bits_per_sample"] = 16
-            elif target_format == AudioFormat.WAV:
-                # Avoid float32 WAV — many players decode it incorrectly.
-                save_kwargs["encoding"] = "PCM_S"
-                save_kwargs["bits_per_sample"] = 16
-                audio_tensor = (
-                    audio_tensor.detach().float().cpu().clamp(-1.0, 1.0)
-                )
 
             torchaudio.save(
                 str(tmp_path),

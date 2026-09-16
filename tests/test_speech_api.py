@@ -108,7 +108,11 @@ def test_non_stream_wav(client, mock_speech):
     )
     assert response.status_code == 200
     assert "audio/wav" in response.headers["content-type"]
-    assert len(response.content) > 0
+    expected = AudioConverter.convert(
+        mock_speech["audio"], mock_speech["sample_rate"], AudioFormat.WAV
+    )
+    assert response.content == expected
+    assert response.content[:4] == b"RIFF"
 
 
 def test_stream_pcm(client, mock_speech):

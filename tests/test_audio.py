@@ -1,10 +1,13 @@
 """Tests for PCM / audio format conversion."""
 
+import io
 import struct
+import wave
 
 import pytest
 import torch
 
+from wavhost.audio import encode_wav, save_wav
 from wavhost.server import (
     PCM_SAMPLE_RATES,
     AudioConverter,
@@ -93,3 +96,46 @@ def test_get_filename_uses_pcm_extension():
 
 def test_get_media_type_for_pcm():
     assert AudioConverter.get_media_type(AudioFormat.PCM_44100) == "audio/pcm"
+
+
+def test_wav_convert_is_s16le_riff_without_torchaudio():
+    """WAV is stdlib-encoded 16-bit PCM so torchaudio/TorchCodec is not required."""
+    src_rate = 24000
+    audio = _sine(src_rate, seconds=0.05)
+
+    data = AudioConverter.convert(audio, src_rate, AudioFormat.WAV)
+
+    assert data[:4] == b"RIFF"
+    assert data[8:12] == b"WAVE"
+    with wave.open(io.BytesIO(data), "rb") as reader:
+        assert reader.getnchannels() == 1
+        assert reader.getsampwidth() == 2
+        assert reader.getframerate() == src_rate
+        frames = reader.readframes(reader.getnframes())
+
+    assert frames == AudioConverter.to_pcm16_bytes(audio)
+
+
+def test_wav_encode_interleaves_stereo_frames():
+    left = torch.tensor([0.0, 0.5], dtype=torch.float32)
+    right = torch.tensor([-0.5, 1.0], dtype=torch.float32)
+    audio = torch.stack([left, right], dim=0)
+
+    data = encode_wav(audio, 16000)
+    with wave.open(io.BytesIO(data), "rb") as reader:
+        assert reader.getnchannels() == 2
+        assert reader.getsampwidth() == 2
+        assert reader.getframerate() == 16000
+        frames = reader.readframes(reader.getnframes())
+
+    samples = struct.unpack("<hhhh", frames)
+    assert samples == (0, -16383, 16383, 32767)
+
+
+def test_save_wav_writes_pcm_file(tmp_path):
+    audio = _sine(16000, seconds=0.02)
+    path = save_wav(tmp_path / "out.wav", audio, 16000)
+    with wave.open(str(path), "rb") as reader:
+        assert reader.getframerate() == 16000
+        assert reader.getnchannels() == 1
+        assert reader.getsampwidth() == 2
