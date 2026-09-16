@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Navigation } from "@/components/Navigation";
 import { DocsLayout } from "@/components/DocsLayout";
+import { CopyButton } from "@/components/CopyButton";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -30,33 +31,43 @@ function Param({
   );
 }
 
-function CodeBlock({ text }: { text: string }) {
+function CodeBlock({ text, label }: { text: string; label: string }) {
   return (
-    <pre className="code docs-code">
-      <code>{text}</code>
-    </pre>
+    <div className="code-wrap">
+      <CopyButton text={text} className="copy-btn copy-btn--block" label={label} />
+      <pre className="code docs-code">
+        <code data-copy>{text}</code>
+      </pre>
+    </div>
   );
 }
 
-function EndpointRow({
+function Endpoint({
   id,
   method,
   path,
-  notes,
+  description,
+  children,
 }: {
   id: string;
   method: "get" | "post" | "delete";
   path: string;
-  notes: ReactNode;
+  description: ReactNode;
+  children?: ReactNode;
 }) {
   return (
-    <li className="endpoint-row" id={id}>
-      <span className={`method method-${method}`}>{method.toUpperCase()}</span>
-      <div className="endpoint-row-main">
-        <code className="endpoint-row-path">{path}</code>
-        <p className="endpoint-row-notes">{notes}</p>
+    <article className="endpoint" id={id} aria-labelledby={`${id}-title`}>
+      <header className="endpoint-head">
+        <span className={`method method-${method}`}>{method.toUpperCase()}</span>
+        <code className="endpoint-path" id={`${id}-title`}>
+          {path}
+        </code>
+      </header>
+      <div className="endpoint-body">
+        <p className="endpoint-desc">{description}</p>
+        {children}
       </div>
-    </li>
+    </article>
   );
 }
 
@@ -85,6 +96,16 @@ const CREATE_VOICE_CURL = `curl -X POST http://localhost:11435/v1/voices \\
   -F "name=narrator" \\
   -F "file=@reference.wav" \\
   -F "description=Professional narrator voice"`;
+
+const LIST_VOICES_CURL = `curl http://localhost:11435/v1/voices`;
+
+const GET_VOICE_CURL = `curl http://localhost:11435/v1/voices/narrator`;
+
+const DELETE_VOICE_CURL = `curl -X DELETE http://localhost:11435/v1/voices/narrator`;
+
+const LIST_MODELS_CURL = `curl http://localhost:11435/v1/models`;
+
+const HEALTH_CURL = `curl http://localhost:11435/health`;
 
 const PYTHON_CLIENT = `from openai import OpenAI
 
@@ -141,150 +162,172 @@ export default function APIPage() {
             Speech
           </p>
 
-          <article className="endpoint" id="post-speech" aria-labelledby="post-speech-title">
-            <header className="endpoint-head">
-              <span className="method method-post">POST</span>
-              <code className="endpoint-path" id="post-speech-title">
-                /v1/audio/speech
-              </code>
-            </header>
-            <div className="endpoint-body">
-              <p className="endpoint-desc">
+          <Endpoint
+            id="post-speech"
+            method="post"
+            path="/v1/audio/speech"
+            description={
+              <>
                 Generate speech from text. Response is binary audio (
                 <code>audio/mpeg</code>, <code>audio/pcm</code>, …).
+              </>
+            }
+          >
+            <p className="docs-example-label">Body</p>
+            <ul className="docs-param-list">
+              <Param name="model" type="string">
+                Required. e.g. <code>chatterbox-turbo</code>
+              </Param>
+              <Param name="input" type="string">
+                Required. Text to synthesize (max 4096)
+              </Param>
+              <Param name="voice" type="string">
+                Optional. Saved voice, Qwen speaker (<code>Ryan</code>, …), path, or{" "}
+                <code>default</code>
+              </Param>
+              <Param name="language" type="string">
+                Optional. Chatterbox Multilingual ISO (<code>fr</code>, <code>zh</code>, …) or Qwen
+                language name
+              </Param>
+              <Param name="response_format" type="string">
+                Optional. Default <code>mp3</code>. Also <code>wav</code>, <code>opus</code>,{" "}
+                <code>flac</code>, <code>aac</code>, <code>pcm</code>, <code>pcm_16000</code>,{" "}
+                <code>pcm_22050</code>, <code>pcm_24000</code>, <code>pcm_44100</code>
+              </Param>
+              <Param name="speed" type="float">
+                Optional 0.25–4.0 (not implemented yet)
+              </Param>
+              <Param name="stream" type="bool">
+                Optional. Default <code>false</code>. Progressive download; only <code>mp3</code>{" "}
+                and <code>pcm</code> / <code>pcm_*</code>
+              </Param>
+            </ul>
+
+            <div className="model-note">
+              <p>
+                <strong>Streaming</strong> — <code>stream: true</code> returns chunked bytes.
+                Allowed: <code>mp3</code>, <code>pcm</code>, <code>pcm_*</code>. Rejected with{" "}
+                <code>400</code>: <code>wav</code>, <code>opus</code>, <code>aac</code>,{" "}
+                <code>flac</code>. For <code>pcm</code>, Content-Type is <code>audio/pcm</code> at
+                the model&apos;s native sample rate.
               </p>
-
-              <p className="docs-example-label">Body</p>
-              <ul className="docs-param-list">
-                <Param name="model" type="string">
-                  Required. e.g. <code>chatterbox-turbo</code>
-                </Param>
-                <Param name="input" type="string">
-                  Required. Text to synthesize (max 4096)
-                </Param>
-                <Param name="voice" type="string">
-                  Optional. Saved voice, Qwen speaker (<code>Ryan</code>, …), path, or{" "}
-                  <code>default</code>
-                </Param>
-                <Param name="language" type="string">
-                  Optional. Chatterbox Multilingual ISO (<code>fr</code>, <code>zh</code>, …) or
-                  Qwen language name
-                </Param>
-                <Param name="response_format" type="string">
-                  Optional. Default <code>mp3</code>. Also <code>wav</code>, <code>opus</code>,{" "}
-                  <code>flac</code>, <code>aac</code>, <code>pcm</code>, <code>pcm_16000</code>,{" "}
-                  <code>pcm_22050</code>, <code>pcm_24000</code>, <code>pcm_44100</code>
-                </Param>
-                <Param name="speed" type="float">
-                  Optional 0.25–4.0 (not implemented yet)
-                </Param>
-                <Param name="stream" type="bool">
-                  Optional. Default <code>false</code>. Progressive download; only{" "}
-                  <code>mp3</code> and <code>pcm</code> / <code>pcm_*</code>
-                </Param>
-              </ul>
-
-              <div className="model-note">
-                <p>
-                  <strong>Streaming</strong> — <code>stream: true</code> returns chunked bytes.
-                  Allowed: <code>mp3</code>, <code>pcm</code>, <code>pcm_*</code>. Rejected with{" "}
-                  <code>400</code>: <code>wav</code>, <code>opus</code>, <code>aac</code>,{" "}
-                  <code>flac</code>. For <code>pcm</code>, Content-Type is <code>audio/pcm</code>{" "}
-                  at the model&apos;s native sample rate.
-                </p>
-                <p>
-                  Errors: <code>400</code> bad params / unsupported stream format ·{" "}
-                  <code>404</code> model not found · <code>500</code> generation failed.
-                </p>
-              </div>
-
-              <p className="docs-example-label">Example</p>
-              <CodeBlock text={SPEECH_CURL} />
-
-              <p className="docs-example-label">Streaming</p>
-              <CodeBlock text={STREAM_CURL} />
+              <p>
+                Errors: <code>400</code> bad params / unsupported stream format · <code>404</code>{" "}
+                model not found · <code>500</code> generation failed.
+              </p>
             </div>
-          </article>
+
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={SPEECH_CURL} label="Copy speech curl" />
+
+            <p className="docs-example-label">Streaming</p>
+            <CodeBlock text={STREAM_CURL} label="Copy streaming curl" />
+          </Endpoint>
 
           <p className="docs-section-label" id="voices">
             Voices
           </p>
 
-          <article className="endpoint" id="post-voices" aria-labelledby="post-voices-title">
-            <header className="endpoint-head">
-              <span className="method method-post">POST</span>
-              <code className="endpoint-path" id="post-voices-title">
-                /v1/voices
-              </code>
-            </header>
-            <div className="endpoint-body">
-              <p className="endpoint-desc">
+          <Endpoint
+            id="post-voices"
+            method="post"
+            path="/v1/voices"
+            description={
+              <>
                 Create a voice from reference audio (<code>multipart/form-data</code>).
-              </p>
-              <ul className="docs-param-list">
-                <Param name="name" type="string">
-                  Required. Voice name
-                </Param>
-                <Param name="file" type="file">
-                  Required. Reference audio file
-                </Param>
-                <Param name="description" type="string">
-                  Optional. Short description
-                </Param>
-              </ul>
-              <p className="docs-example-label">Example</p>
-              <CodeBlock text={CREATE_VOICE_CURL} />
-            </div>
-          </article>
+              </>
+            }
+          >
+            <p className="docs-example-label">Body</p>
+            <ul className="docs-param-list">
+              <Param name="name" type="string">
+                Required. Voice name
+              </Param>
+              <Param name="file" type="file">
+                Required. Reference audio file
+              </Param>
+              <Param name="description" type="string">
+                Optional. Short description
+              </Param>
+            </ul>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={CREATE_VOICE_CURL} label="Copy create voice" />
+          </Endpoint>
 
-          <ul className="endpoint-list" aria-label="Voice endpoints">
-            <EndpointRow
-              id="get-voices"
-              method="get"
-              path="/v1/voices"
-              notes="List saved voices"
-            />
-            <EndpointRow
-              id="get-voice"
-              method="get"
-              path="/v1/voices/{name}"
-              notes="Get one voice's details"
-            />
-            <EndpointRow
-              id="delete-voice"
-              method="delete"
-              path="/v1/voices/{name}"
-              notes="Delete a saved voice"
-            />
-          </ul>
+          <Endpoint
+            id="get-voices"
+            method="get"
+            path="/v1/voices"
+            description="List all saved voices in the local library."
+          >
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={LIST_VOICES_CURL} label="Copy list voices" />
+          </Endpoint>
+
+          <Endpoint
+            id="get-voice"
+            method="get"
+            path="/v1/voices/{name}"
+            description="Get details for one saved voice."
+          >
+            <p className="docs-example-label">Path</p>
+            <ul className="docs-param-list">
+              <Param name="name" type="string">
+                Required. Voice name
+              </Param>
+            </ul>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={GET_VOICE_CURL} label="Copy get voice" />
+          </Endpoint>
+
+          <Endpoint
+            id="delete-voice"
+            method="delete"
+            path="/v1/voices/{name}"
+            description="Delete a saved voice and clean up unused reference audio."
+          >
+            <p className="docs-example-label">Path</p>
+            <ul className="docs-param-list">
+              <Param name="name" type="string">
+                Required. Voice name
+              </Param>
+            </ul>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={DELETE_VOICE_CURL} label="Copy delete voice" />
+          </Endpoint>
 
           <p className="docs-section-label" id="models-health">
             Models &amp; health
           </p>
 
-          <ul className="endpoint-list" aria-label="Models and health">
-            <EndpointRow
-              id="get-models"
-              method="get"
-              path="/v1/models"
-              notes="List models (OpenAI-shaped)"
-            />
-            <EndpointRow
-              id="get-health"
-              method="get"
-              path="/health"
-              notes={
-                <>
-                  Health check → <code>{`{"status":"ok"}`}</code>
-                </>
-              }
-            />
-          </ul>
+          <Endpoint
+            id="get-models"
+            method="get"
+            path="/v1/models"
+            description="List available models (OpenAI-shaped), including install status."
+          >
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={LIST_MODELS_CURL} label="Copy models" />
+          </Endpoint>
+
+          <Endpoint
+            id="get-health"
+            method="get"
+            path="/health"
+            description={
+              <>
+                Health check. Returns <code>{`{"status":"ok"}`}</code>.
+              </>
+            }
+          >
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={HEALTH_CURL} label="Copy health" />
+          </Endpoint>
 
           <p className="docs-section-label" id="python">
             Python client
           </p>
-          <CodeBlock text={PYTHON_CLIENT} />
+          <CodeBlock text={PYTHON_CLIENT} label="Copy Python" />
         </div>
 
         <nav className="docs-pager" aria-label="Pagination">

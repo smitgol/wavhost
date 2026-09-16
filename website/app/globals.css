@@ -1500,7 +1500,7 @@ code {
 }
 
 .docs-example-label {
-  margin: 0.85rem 0 0.35rem;
+  margin: 1.35rem 0 0.45rem;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -1509,7 +1509,16 @@ code {
 }
 
 .docs-example-label:first-child {
-  margin-top: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.endpoint-body > .docs-example-label:first-of-type {
+  margin-top: 1.15rem;
+}
+
+.endpoint-body > .model-note + .docs-example-label,
+.endpoint-body > .docs-param-list + .docs-example-label {
+  margin-top: 1.35rem;
 }
 
 .endpoint {
@@ -1649,12 +1658,11 @@ code {
 .endpoint .code,
 .docs-code {
   background: var(--code-bg);
-  margin: 0.35rem 0 0.75rem;
-  padding-right: 1.1rem;
+  margin: 0;
 }
 
 .endpoint .code-wrap {
-  margin: 0.35rem 0 0.75rem;
+  margin: 0.35rem 0 0.85rem;
 }
 
 .endpoint .model-note {
