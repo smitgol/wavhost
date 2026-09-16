@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Navigation } from "@/components/Navigation";
 import { DocsLayout } from "@/components/DocsLayout";
-import { CopyButton } from "@/components/CopyButton";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -10,15 +9,6 @@ export const metadata: Metadata = {
   description:
     "Wavhost API reference — speech, voices, models, health. OpenAI-compatible local server.",
 };
-
-function CommandChip({ text, label }: { text: string; label: string }) {
-  return (
-    <div className="model-cmd">
-      <code data-copy>{text}</code>
-      <CopyButton text={text} className="copy-btn copy-btn--chip" label={label} />
-    </div>
-  );
-}
 
 function Param({
   name,
@@ -40,14 +30,33 @@ function Param({
   );
 }
 
-function CodeBlock({ text, label }: { text: string; label: string }) {
+function CodeBlock({ text }: { text: string }) {
   return (
-    <div className="code-wrap">
-      <CopyButton text={text} className="copy-btn copy-btn--block" label={label} />
-      <pre className="code">
-        <code data-copy>{text}</code>
-      </pre>
-    </div>
+    <pre className="code docs-code">
+      <code>{text}</code>
+    </pre>
+  );
+}
+
+function EndpointRow({
+  id,
+  method,
+  path,
+  notes,
+}: {
+  id: string;
+  method: "get" | "post" | "delete";
+  path: string;
+  notes: ReactNode;
+}) {
+  return (
+    <li className="endpoint-row" id={id}>
+      <span className={`method method-${method}`}>{method.toUpperCase()}</span>
+      <div className="endpoint-row-main">
+        <code className="endpoint-row-path">{path}</code>
+        <p className="endpoint-row-notes">{notes}</p>
+      </div>
+    </li>
   );
 }
 
@@ -190,10 +199,10 @@ export default function APIPage() {
               </div>
 
               <p className="docs-example-label">Example</p>
-              <CodeBlock text={SPEECH_CURL} label="Copy speech curl" />
+              <CodeBlock text={SPEECH_CURL} />
 
               <p className="docs-example-label">Streaming</p>
-              <CodeBlock text={STREAM_CURL} label="Copy streaming curl" />
+              <CodeBlock text={STREAM_CURL} />
             </div>
           </article>
 
@@ -224,44 +233,29 @@ export default function APIPage() {
                 </Param>
               </ul>
               <p className="docs-example-label">Example</p>
-              <CodeBlock text={CREATE_VOICE_CURL} label="Copy create voice" />
+              <CodeBlock text={CREATE_VOICE_CURL} />
             </div>
           </article>
 
           <ul className="endpoint-list" aria-label="Voice endpoints">
-            <li className="endpoint-row" id="get-voices">
-              <span className="method method-get">GET</span>
-              <div className="endpoint-row-main">
-                <code className="endpoint-row-path">/v1/voices</code>
-                <p className="endpoint-row-notes">List saved voices</p>
-              </div>
-              <CommandChip
-                text="curl http://localhost:11435/v1/voices"
-                label="Copy list voices"
-              />
-            </li>
-            <li className="endpoint-row" id="get-voice">
-              <span className="method method-get">GET</span>
-              <div className="endpoint-row-main">
-                <code className="endpoint-row-path">/v1/voices/{"{name}"}</code>
-                <p className="endpoint-row-notes">Get one voice&apos;s details</p>
-              </div>
-              <CommandChip
-                text="curl http://localhost:11435/v1/voices/narrator"
-                label="Copy get voice"
-              />
-            </li>
-            <li className="endpoint-row" id="delete-voice">
-              <span className="method method-delete">DELETE</span>
-              <div className="endpoint-row-main">
-                <code className="endpoint-row-path">/v1/voices/{"{name}"}</code>
-                <p className="endpoint-row-notes">Delete a saved voice</p>
-              </div>
-              <CommandChip
-                text="curl -X DELETE http://localhost:11435/v1/voices/narrator"
-                label="Copy delete voice"
-              />
-            </li>
+            <EndpointRow
+              id="get-voices"
+              method="get"
+              path="/v1/voices"
+              notes="List saved voices"
+            />
+            <EndpointRow
+              id="get-voice"
+              method="get"
+              path="/v1/voices/{name}"
+              notes="Get one voice's details"
+            />
+            <EndpointRow
+              id="delete-voice"
+              method="delete"
+              path="/v1/voices/{name}"
+              notes="Delete a saved voice"
+            />
           </ul>
 
           <p className="docs-section-label" id="models-health">
@@ -269,33 +263,28 @@ export default function APIPage() {
           </p>
 
           <ul className="endpoint-list" aria-label="Models and health">
-            <li className="endpoint-row" id="get-models">
-              <span className="method method-get">GET</span>
-              <div className="endpoint-row-main">
-                <code className="endpoint-row-path">/v1/models</code>
-                <p className="endpoint-row-notes">List models (OpenAI-shaped)</p>
-              </div>
-              <CommandChip
-                text="curl http://localhost:11435/v1/models"
-                label="Copy models"
-              />
-            </li>
-            <li className="endpoint-row" id="get-health">
-              <span className="method method-get">GET</span>
-              <div className="endpoint-row-main">
-                <code className="endpoint-row-path">/health</code>
-                <p className="endpoint-row-notes">
+            <EndpointRow
+              id="get-models"
+              method="get"
+              path="/v1/models"
+              notes="List models (OpenAI-shaped)"
+            />
+            <EndpointRow
+              id="get-health"
+              method="get"
+              path="/health"
+              notes={
+                <>
                   Health check → <code>{`{"status":"ok"}`}</code>
-                </p>
-              </div>
-              <CommandChip text="curl http://localhost:11435/health" label="Copy health" />
-            </li>
+                </>
+              }
+            />
           </ul>
 
           <p className="docs-section-label" id="python">
             Python client
           </p>
-          <CodeBlock text={PYTHON_CLIENT} label="Copy Python" />
+          <CodeBlock text={PYTHON_CLIENT} />
         </div>
 
         <nav className="docs-pager" aria-label="Pagination">

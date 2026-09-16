@@ -1451,8 +1451,8 @@ code {
 
 .docs-param {
   display: grid;
-  grid-template-columns: minmax(7.5rem, 11rem) minmax(0, 1fr);
-  gap: 0.35rem 1rem;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.35rem 1.15rem;
   padding: 0.65rem 0.85rem;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
@@ -1561,16 +1561,16 @@ code {
 
 .endpoint-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.65rem 0.85rem;
-  align-items: center;
-  padding: 0.7rem 0.85rem;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  align-items: start;
+  padding: 0.75rem 0.95rem;
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
 
 .endpoint-row--plain {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .endpoint-row:last-child {
@@ -1583,19 +1583,30 @@ code {
 
 .endpoint-row-main {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .endpoint-row-path {
   display: block;
   font-size: 0.8125rem;
   color: var(--ink);
+  line-height: 1.35;
 }
 
 .endpoint-row-notes {
-  margin: 0.2rem 0 0;
+  margin: 0;
   font-size: 0.75rem;
   color: var(--ink-muted);
   line-height: 1.4;
+}
+
+.endpoint-row .method {
+  justify-self: start;
+  margin-top: 0.05rem;
+  min-width: 3.6rem;
+  justify-content: center;
 }
 
 .method {
@@ -1635,8 +1646,11 @@ code {
   background: var(--bg);
 }
 
-.endpoint .code {
+.endpoint .code,
+.docs-code {
   background: var(--code-bg);
+  margin: 0.35rem 0 0.75rem;
+  padding-right: 1.1rem;
 }
 
 .endpoint .code-wrap {
@@ -1663,14 +1677,12 @@ code {
     grid-template-columns: 1fr;
   }
 
-  .endpoint-row,
-  .endpoint-row--plain {
-    grid-template-columns: auto minmax(0, 1fr);
+  .endpoint-row {
+    grid-template-columns: 4.25rem minmax(0, 1fr);
   }
 
-  .endpoint-row .model-cmd,
-  .endpoint-row--plain .model-cmd {
-    grid-column: 1 / -1;
+  .endpoint-row--plain {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
