@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Navigation } from "@/components/Navigation";
 import { DocsLayout } from "@/components/DocsLayout";
-import { CodeSnippet } from "@/components/CodeSnippet";
+import { ApiEndpoint } from "@/components/ApiEndpoint";
+import { CodeBlock } from "@/components/CodeBlock";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -28,35 +29,6 @@ function Param({
       </div>
       <p className="docs-param-desc">{children}</p>
     </li>
-  );
-}
-
-function Endpoint({
-  id,
-  method,
-  path,
-  description,
-  children,
-}: {
-  id: string;
-  method: "get" | "post" | "delete";
-  path: string;
-  description: ReactNode;
-  children?: ReactNode;
-}) {
-  return (
-    <article className="endpoint" id={id} aria-labelledby={`${id}-title`}>
-      <header className="endpoint-head">
-        <span className={`method method-${method}`}>{method.toUpperCase()}</span>
-        <code className="endpoint-path" id={`${id}-title`}>
-          {path}
-        </code>
-      </header>
-      <div className="endpoint-body">
-        <p className="endpoint-desc">{description}</p>
-        {children}
-      </div>
-    </article>
   );
 }
 
@@ -196,10 +168,11 @@ export default function APIPage() {
             Speech
           </p>
 
-          <Endpoint
+          <ApiEndpoint
             id="post-speech"
             method="post"
             path="/v1/audio/speech"
+            defaultOpen
             description={
               <>
                 Generate speech from text. Response is binary audio (
@@ -251,25 +224,18 @@ export default function APIPage() {
               </p>
             </div>
 
-            <CodeSnippet
-              title="Example"
-              text={SPEECH_CURL}
-              label="Copy speech curl"
-              defaultOpen
-            />
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={SPEECH_CURL} label="Copy speech curl" />
 
-            <CodeSnippet
-              title="Streaming"
-              text={STREAM_CURL}
-              label="Copy streaming curl"
-            />
-          </Endpoint>
+            <p className="docs-example-label">Streaming</p>
+            <CodeBlock text={STREAM_CURL} label="Copy streaming curl" />
+          </ApiEndpoint>
 
           <p className="docs-section-label" id="voices">
             Voices
           </p>
 
-          <Endpoint
+          <ApiEndpoint
             id="post-voices"
             method="post"
             path="/v1/voices"
@@ -291,34 +257,23 @@ export default function APIPage() {
                 Optional. Short description
               </Param>
             </ul>
-            <CodeSnippet
-              title="Example"
-              text={CREATE_VOICE_CURL}
-              label="Copy create voice"
-              defaultOpen
-            />
-          </Endpoint>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={CREATE_VOICE_CURL} label="Copy create voice" />
+          </ApiEndpoint>
 
-          <Endpoint
+          <ApiEndpoint
             id="get-voices"
             method="get"
             path="/v1/voices"
             description="List all saved voices in the local library."
           >
-            <CodeSnippet
-              title="Example"
-              text={LIST_VOICES_CURL}
-              label="Copy list voices"
-              defaultOpen
-            />
-            <CodeSnippet
-              title="Response"
-              text={LIST_VOICES_RESPONSE}
-              label="Copy list voices response"
-            />
-          </Endpoint>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={LIST_VOICES_CURL} label="Copy list voices" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={LIST_VOICES_RESPONSE} label="Copy list voices response" />
+          </ApiEndpoint>
 
-          <Endpoint
+          <ApiEndpoint
             id="get-voice"
             method="get"
             path="/v1/voices/{name}"
@@ -330,20 +285,13 @@ export default function APIPage() {
                 Required. Voice name
               </Param>
             </ul>
-            <CodeSnippet
-              title="Example"
-              text={GET_VOICE_CURL}
-              label="Copy get voice"
-              defaultOpen
-            />
-            <CodeSnippet
-              title="Response"
-              text={GET_VOICE_RESPONSE}
-              label="Copy get voice response"
-            />
-          </Endpoint>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={GET_VOICE_CURL} label="Copy get voice" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={GET_VOICE_RESPONSE} label="Copy get voice response" />
+          </ApiEndpoint>
 
-          <Endpoint
+          <ApiEndpoint
             id="delete-voice"
             method="delete"
             path="/v1/voices/{name}"
@@ -355,38 +303,27 @@ export default function APIPage() {
                 Required. Voice name
               </Param>
             </ul>
-            <CodeSnippet
-              title="Example"
-              text={DELETE_VOICE_CURL}
-              label="Copy delete voice"
-              defaultOpen
-            />
-          </Endpoint>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={DELETE_VOICE_CURL} label="Copy delete voice" />
+          </ApiEndpoint>
 
           <p className="docs-section-label" id="models-health">
             Models &amp; health
           </p>
 
-          <Endpoint
+          <ApiEndpoint
             id="get-models"
             method="get"
             path="/v1/models"
             description="List available models (OpenAI-shaped), including install status."
           >
-            <CodeSnippet
-              title="Example"
-              text={LIST_MODELS_CURL}
-              label="Copy models"
-              defaultOpen
-            />
-            <CodeSnippet
-              title="Response"
-              text={LIST_MODELS_RESPONSE}
-              label="Copy models response"
-            />
-          </Endpoint>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={LIST_MODELS_CURL} label="Copy models" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={LIST_MODELS_RESPONSE} label="Copy models response" />
+          </ApiEndpoint>
 
-          <Endpoint
+          <ApiEndpoint
             id="get-health"
             method="get"
             path="/health"
@@ -396,28 +333,17 @@ export default function APIPage() {
               </>
             }
           >
-            <CodeSnippet
-              title="Example"
-              text={HEALTH_CURL}
-              label="Copy health"
-              defaultOpen
-            />
-            <CodeSnippet
-              title="Response"
-              text={HEALTH_RESPONSE}
-              label="Copy health response"
-            />
-          </Endpoint>
+            <p className="docs-example-label">Example</p>
+            <CodeBlock text={HEALTH_CURL} label="Copy health" />
+            <p className="docs-example-label">Response</p>
+            <CodeBlock text={HEALTH_RESPONSE} label="Copy health response" />
+          </ApiEndpoint>
 
           <p className="docs-section-label" id="python">
             Python client
           </p>
-          <CodeSnippet
-            title="Example"
-            text={PYTHON_CLIENT}
-            label="Copy Python"
-            defaultOpen
-          />
+          <p className="docs-example-label">Example</p>
+          <CodeBlock text={PYTHON_CLIENT} label="Copy Python" />
         </div>
 
         <nav className="docs-pager" aria-label="Pagination">

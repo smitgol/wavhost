@@ -1530,14 +1530,50 @@ code {
   overflow: hidden;
 }
 
+.endpoint-accordion {
+  width: 100%;
+}
+
+.endpoint-accordion .endpoint {
+  border: 1px solid var(--line);
+}
+
 .endpoint-head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  width: 100%;
+  padding: 0.75rem 0.95rem;
+  margin: 0;
+  border-radius: 0;
+  border-bottom: 1px solid transparent;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.endpoint-accordion [data-state="open"] > .endpoint-head {
+  border-bottom-color: var(--line);
+}
+
+.endpoint-head-lead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem 0.75rem;
-  padding: 0.75rem 0.95rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.endpoint-body-wrap {
+  padding: 0;
+}
+
+.endpoint-body-wrap > div {
+  padding: 0;
+  height: auto;
 }
 
 .endpoint-body {
