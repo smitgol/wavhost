@@ -40,7 +40,14 @@ export default function APIPage() {
             <span className="method method-post">POST</span>
             <code className="endpoint-path">/v1/audio/speech</code>
           </header>
-          <p>Generate speech from text (OpenAI-compatible). Response is binary audio.</p>
+          <p>
+            Generate speech from text (OpenAI-compatible). Response is binary audio. With{" "}
+            <code>stream: true</code>, audio is returned as a progressive download (chunked bytes).
+            Streaming allows <code>mp3</code> and <code>pcm</code> / <code>pcm_*</code>;{" "}
+            <code>wav</code>, <code>opus</code>, <code>aac</code>, and <code>flac</code> return{" "}
+            <code>400</code>. For <code>pcm</code>, Content-Type is <code>audio/pcm</code> at the
+            model&apos;s native sample rate.
+          </p>
           <div className="code-wrap">
             <CopyButton
               text={`curl http://localhost:11435/v1/audio/speech \\
@@ -66,6 +73,36 @@ export default function APIPage() {
     "response_format": "mp3"
   }' \\
   --output speech.mp3`}
+              </code>
+            </pre>
+          </div>
+          <div className="code-wrap">
+            <CopyButton
+              text={`curl http://127.0.0.1:11435/v1/audio/speech \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "chatterbox-nano",
+    "input": "Hello",
+    "voice": "default",
+    "stream": true,
+    "response_format": "pcm"
+  }' \\
+  --output out.pcm`}
+              className="copy-btn copy-btn--block"
+              label="Copy streaming curl"
+            />
+            <pre className="code">
+              <code data-copy>
+                {`curl http://127.0.0.1:11435/v1/audio/speech \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "chatterbox-nano",
+    "input": "Hello",
+    "voice": "default",
+    "stream": true,
+    "response_format": "pcm"
+  }' \\
+  --output out.pcm`}
               </code>
             </pre>
           </div>
@@ -131,11 +168,21 @@ export default function APIPage() {
                 <td>float</td>
                 <td>Optional 0.25–4.0 (not implemented yet)</td>
               </tr>
+              <tr>
+                <td>
+                  <code>stream</code>
+                </td>
+                <td>bool</td>
+                <td>
+                  Optional. Default <code>false</code>. When <code>true</code>, progressive
+                  download; only <code>mp3</code> and <code>pcm</code> / <code>pcm_*</code>
+                </td>
+              </tr>
             </tbody>
           </table>
           <p className="docs-note">
-            Errors: <code>400</code> unknown voice / bad params · <code>404</code> model not found
-            · <code>500</code> generation failed.
+            Errors: <code>400</code> unknown voice / bad params / unsupported stream format ·{" "}
+            <code>404</code> model not found · <code>500</code> generation failed.
           </p>
         </article>
 

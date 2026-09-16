@@ -416,7 +416,8 @@ Generate speech from text (OpenAI-compatible).
   "input": "Text to synthesize",
   "voice": "default",
   "response_format": "mp3",
-  "speed": 1.0
+  "speed": 1.0,
+  "stream": false
 }
 ```
 
@@ -428,12 +429,24 @@ Generate speech from text (OpenAI-compatible).
   - Encoded: `mp3`, `wav`, `opus`, `flac`, `aac`
   - Raw PCM (signed 16-bit little-endian): `pcm` (model native rate), `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`
 - `speed` (float, optional): Speed multiplier 0.25-4.0 (currently not implemented)
+- `stream` (bool, optional): If `true`, return audio as a progressive download (chunked bytes). Defaults to `false`.
+  - Allowed with `stream=true`: `mp3`, `pcm`, `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`
+  - Not allowed: `wav`, `opus`, `aac`, `flac` (HTTP 400)
+  - Content-Type matches the format (`audio/mpeg` or `audio/pcm`). For `pcm`, sample rate is model-native S16LE.
+
+**Streaming example:**
+```bash
+curl http://127.0.0.1:11435/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{"model":"chatterbox-nano","input":"Hello","voice":"default","stream":true,"response_format":"pcm"}' \
+  --output out.pcm
+```
 
 **Response:**
-Binary audio file in the requested format.
+Binary audio file in the requested format (or chunked progressive download when `stream=true`).
 
 **Error Responses:**
-- `400 Bad Request`: Unknown voice or invalid parameters
+- `400 Bad Request`: Unknown voice, invalid parameters, or unsupported format for streaming
 - `404 Not Found`: Model not found
 - `500 Internal Server Error`: Generation failed
 
@@ -694,11 +707,12 @@ mypy wavhost
 - ✅ CLI (pull, run, serve)
 - ✅ OpenAI-compatible API
 - ✅ Local voice library (create, save, manage via CLI and API)
+- ✅ Streaming speech (`stream=true` for mp3 / pcm)
 
 ### Future
-- Streaming audio generation
 - Model quantization
 - More backends
+- Opus / additional format streaming
 
 ## Use Cases
 
