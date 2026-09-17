@@ -166,6 +166,10 @@ export default function Home() {
               Voice CRUD: <code>POST/GET/DELETE /v1/voices</code> — see{" "}
               <Link href="/docs/api#voices">Docs</Link>.
             </p>
+            <p className="hint hint-left">
+              Progressive download via <code>stream: true</code> for <code>mp3</code> and{" "}
+              <code>pcm</code> — see <Link href="/docs/api">Docs</Link>.
+            </p>
           </div>
         </section>
 
@@ -187,7 +191,7 @@ export default function Home() {
             <h2>What it isn&apos;t (v0)</h2>
             <ul className="plain">
               <li>Not cloud SaaS, marketplace, or voice sharing</li>
-              <li>Not speech-to-text, fine-tuning, or streaming synthesis</li>
+              <li>Not speech-to-text or fine-tuning</li>
               <li>Not a web voice studio — CLI + local API only</li>
             </ul>
           </div>
