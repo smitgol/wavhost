@@ -8,6 +8,8 @@
 
 Wavhost is a local text-to-speech (TTS) runtime that brings high-quality voice synthesis to your machine. Run TTS models locally with a simple CLI and OpenAI-compatible HTTP API—no API keys, no per-character billing, complete privacy.
 
+**Website:** [wavhost.vercel.app](https://wavhost.vercel.app) · [Docs](https://wavhost.vercel.app/docs) · [Models](https://wavhost.vercel.app/models) · [CLI](https://wavhost.vercel.app/docs/cli) · [API](https://wavhost.vercel.app/docs/api)
+
 ## Features
 
 - 🚀 **Local-first**: All processing happens on your machine—no API keys, no cloud calls, complete privacy
@@ -144,6 +146,8 @@ wavhost voice rm my-narrator
 
 ## Available Models
 
+Full catalog on the [website](https://wavhost.vercel.app/models).
+
 | Model | Size | Device | Languages | Description |
 |-------|------|--------|-----------|-------------|
 | `chatterbox-turbo` | 350M | GPU | English | Fast, high-quality English TTS (MIT) |
@@ -174,6 +178,8 @@ wavhost run kokoro "Hello from Kokoro" --voice bm_george -o george.wav
 ```
 
 ## CLI Reference
+
+Full CLI reference: [wavhost.vercel.app/docs/cli](https://wavhost.vercel.app/docs/cli)
 
 ### `wavhost pull <model_name>`
 
@@ -325,6 +331,8 @@ pip uninstall wavhost
 ```
 
 ## API Reference
+
+Full API reference: [wavhost.vercel.app/docs/api](https://wavhost.vercel.app/docs/api)
 
 ### Voice Management
 
@@ -777,7 +785,8 @@ Contributions welcome! Please feel free to submit issues and pull requests.
 
 ## Support
 
-- 📖 [Documentation](https://github.com/smitgol/wavhost)
+- 🌐 [Website](https://wavhost.vercel.app)
+- 📖 [Documentation](https://wavhost.vercel.app/docs)
 - 🐛 [Issue Tracker](https://github.com/smitgol/wavhost/issues)
 - 💬 [Discussions](https://github.com/smitgol/wavhost/discussions)
 

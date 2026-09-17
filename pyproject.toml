@@ -78,8 +78,8 @@ publish = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/smitgol/wavhost"
-Documentation = "https://github.com/smitgol/wavhost#readme"
+Homepage = "https://wavhost.vercel.app"
+Documentation = "https://wavhost.vercel.app/docs"
 Repository = "https://github.com/smitgol/wavhost"
 Issues = "https://github.com/smitgol/wavhost/issues"
 Changelog = "https://github.com/smitgol/wavhost/blob/master/CHANGELOG.md"

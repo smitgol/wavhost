@@ -15,7 +15,7 @@ export default function Home() {
       <main id="main">
         <section className="hero">
           <div className="wrap hero-inner">
-            <h1>One API for every local model.</h1>
+            <h1>One API for every local TTS model.</h1>
             <p className="lede">OpenAI-compatible speech. Named voices, saved locally.</p>
             <p className="cta-row">
               <a

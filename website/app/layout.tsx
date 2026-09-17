@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Wavhost",
   description:
-    "One API for every local model. OpenAI-compatible speech. Named voices saved locally. Open source, Apache-2.0.",
+    "One API for every local TTS model. OpenAI-compatible speech. Named voices saved locally. Open source, Apache-2.0.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

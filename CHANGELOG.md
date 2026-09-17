@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kokoro-82M backend (`kokoro`) with 54 named voices, default `af_heart`
 - `wavhost show <model>` to print model details and named voices
 - Website catalog and docs for Kokoro and `wavhost show`
+- README and PyPI project URLs now point at the website and docs
 
 ## [0.2.1] - 2026-09-16
 
