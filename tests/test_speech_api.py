@@ -12,9 +12,18 @@ from wavhost.server import (
     AudioConverter,
     AudioFormat,
     app,
+    clear_backend_cache,
     iter_audio_chunks,
 )
 from wavhost.voices import VoiceStorage
+
+
+@pytest.fixture(autouse=True)
+def isolate_backend_cache():
+    """Speech API tests must not share process-global model backends."""
+    clear_backend_cache()
+    yield
+    clear_backend_cache()
 
 
 @pytest.fixture
@@ -44,11 +53,113 @@ def mock_speech(tmp_path, monkeypatch):
         "wavhost.server.WavhostStorage.ensure_checkpoint",
         lambda self, model_info: ckpt,
     )
-    monkeypatch.setattr(
-        "wavhost.server.create_backend",
-        lambda *args, **kwargs: backend,
+    create_backend = MagicMock(return_value=backend)
+    monkeypatch.setattr("wavhost.server.create_backend", create_backend)
+    return {
+        "generate": generate,
+        "create_backend": create_backend,
+        "audio": audio,
+        "sample_rate": sample_rate,
+    }
+
+
+def test_speech_reuses_warm_backend(client, mock_speech):
+    payload = {
+        "model": "chatterbox-turbo",
+        "input": "Hello",
+        "response_format": "pcm",
+    }
+    first = client.post("/v1/audio/speech", json=payload)
+    second = client.post("/v1/audio/speech", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    mock_speech["create_backend"].assert_called_once()
+    assert mock_speech["generate"].call_count == 2
+
+
+def test_backend_cache_can_be_disabled(client, mock_speech, monkeypatch):
+    monkeypatch.setenv("WAVHOST_BACKEND_CACHE_SIZE", "0")
+    payload = {
+        "model": "chatterbox-turbo",
+        "input": "Hello",
+        "response_format": "pcm",
+    }
+    first = client.post("/v1/audio/speech", json=payload)
+    second = client.post("/v1/audio/speech", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert mock_speech["create_backend"].call_count == 2
+
+
+def test_backend_cache_lru_limit(client, mock_speech, monkeypatch):
+    monkeypatch.setenv("WAVHOST_BACKEND_CACHE_SIZE", "1")
+    base = {"input": "Hello", "response_format": "pcm"}
+
+    first = client.post(
+        "/v1/audio/speech", json={**base, "model": "chatterbox-turbo"}
     )
-    return {"generate": generate, "audio": audio, "sample_rate": sample_rate}
+    second = client.post(
+        "/v1/audio/speech", json={**base, "model": "qwen-0.6-customvoice"}
+    )
+    third = client.post(
+        "/v1/audio/speech", json={**base, "model": "chatterbox-turbo"}
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert third.status_code == 200
+    assert mock_speech["create_backend"].call_count == 3
+
+
+def test_server_device_override_puts_kokoro_on_cuda(client, mock_speech, monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setenv("WAVHOST_DEVICE", "cuda")
+    response = client.post(
+        "/v1/audio/speech",
+        json={"model": "kokoro", "input": "Hello", "response_format": "pcm"},
+    )
+
+    assert response.status_code == 200
+    assert mock_speech["create_backend"].call_args.kwargs["device"] == "cuda"
+
+
+def test_explicit_cuda_does_not_silently_fall_back(client, mock_speech, monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setenv("WAVHOST_DEVICE", "cuda")
+    response = client.post(
+        "/v1/audio/speech",
+        json={"model": "kokoro", "input": "Hello", "response_format": "pcm"},
+    )
+
+    assert response.status_code == 500
+    assert "CUDA is not available" in response.json()["detail"]
+
+
+def test_backend_cache_separates_server_devices(client, mock_speech, monkeypatch):
+    payload = {"model": "chatterbox-turbo", "input": "Hello", "response_format": "pcm"}
+    monkeypatch.setenv("WAVHOST_DEVICE", "cpu")
+    assert client.post("/v1/audio/speech", json=payload).status_code == 200
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setenv("WAVHOST_DEVICE", "cuda")
+    assert client.post("/v1/audio/speech", json=payload).status_code == 200
+
+    assert mock_speech["create_backend"].call_count == 2
+    assert [
+        call.kwargs["device"] for call in mock_speech["create_backend"].call_args_list
+    ] == ["cpu", "cuda"]
+
+
+def test_invalid_server_device_fails_request(client, mock_speech, monkeypatch):
+    monkeypatch.setenv("WAVHOST_DEVICE", "banana")
+    response = client.post(
+        "/v1/audio/speech",
+        json={"model": "chatterbox-turbo", "input": "Hello", "response_format": "pcm"},
+    )
+
+    assert response.status_code == 500
+    assert "WAVHOST_DEVICE" in response.json()["detail"]
 
 
 def test_iter_audio_chunks_empty():

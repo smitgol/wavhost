@@ -39,6 +39,30 @@ pip install "torch==2.6.0+cu124" "torchaudio==2.6.0+cu124" --index-url https://d
 
 Run it *after* the pull (the engine install would otherwise replace it), and note the `+cu124` tag is required — pip considers `2.6.0+cpu` to already satisfy `torch==2.6.0`. The same hint appears if `wavhost run` ever has to fall back to the CPU.
 
+#### Qwen precision selection
+
+Wavhost chooses a conservative Qwen dtype from the selected device when
+`WAVHOST_QWEN_DTYPE=auto` (the default): Ampere and newer CUDA GPUs use BF16,
+Volta/Turing use FP16, and older CUDA GPUs such as Pascal use FP32. CPU uses
+FP32; MPS retains the existing BF16 default. This keeps Qwen usable on older
+NVIDIA cards that cannot run the previous unconditional BF16 path without
+changing the Apple Silicon policy.
+
+For benchmarking or troubleshooting, override the choice explicitly:
+
+```bash
+WAVHOST_QWEN_DTYPE=float32 wavhost run qwen-0.6-customvoice "Hello"
+WAVHOST_QWEN_DTYPE=float16 wavhost run qwen-0.6-customvoice "Hello"
+```
+
+Explicit BF16 is rejected on pre-Ampere CUDA hardware rather than failing later
+inside model loading. FlashAttention 2 remains optional and is not enabled by
+Wavhost automatically. Precision selection cannot restore GPU architectures
+that a PyTorch wheel no longer contains, so older NVIDIA cards still need a
+CUDA/PyTorch build with compatible device code. The Pascal path was exercised
+on a GTX 1080 Ti with a CUDA 12.6 PyTorch build before this change was marked
+ready for review.
+
 ### Pull a Model
 
 ```bash
@@ -84,6 +108,31 @@ wavhost serve
 ```
 
 The server starts on `http://127.0.0.1:11435` with an OpenAI-compatible endpoint.
+
+The HTTP server keeps recently used model backends warm instead of reloading
+weights for every request. The default cache holds one model, which is a safe
+default for GPUs that cannot fit every installed model simultaneously. Increase
+it only when you know the models fit, or disable it for debugging:
+
+```bash
+WAVHOST_BACKEND_CACHE_SIZE=2 wavhost serve
+WAVHOST_BACKEND_CACHE_SIZE=0 wavhost serve
+```
+
+The cache is process-local and uses least-recently-used eviction. Restart the
+server after replacing model checkpoint files on disk.
+
+The HTTP server can also override model device recommendations globally. By
+default `WAVHOST_DEVICE=auto` keeps each registry entry's recommendation. Set
+`WAVHOST_DEVICE=cuda` (or pass `wavhost serve --device cuda`) to force all
+served models, including Kokoro, onto the selected CUDA device. Explicit CUDA
+or MPS requests fail instead of silently benchmarking a CPU fallback when that
+accelerator is unavailable.
+
+```bash
+WAVHOST_DEVICE=cuda wavhost serve
+wavhost serve --device cpu
+```
 
 ### Use the API
 
@@ -188,10 +237,19 @@ Download weight layers into local storage and register the model, installing its
 **Options:**
 - `--force`: Pull even if the model is already installed (still resumes existing blobs)
 - `--skip-deps`: Don't install the backend engine (assume it's already available)
+- `-y, --yes`: Accept the model license and dependency-install prompts noninteractively
 
 **Example:**
 ```bash
 wavhost pull chatterbox-base
+```
+
+For explicit automated provisioning, acknowledge the model license and any
+backend-install prompt without reading from a terminal. The license text is
+still displayed; `--yes` suppresses only the interactive confirmation prompts:
+
+```bash
+wavhost pull chatterbox-base --yes
 ```
 
 ### `wavhost run <model_name> <text>`
@@ -278,6 +336,7 @@ Start the OpenAI-compatible TTS server.
 **Options:**
 - `--host HOST`: Host to bind to (default: `127.0.0.1`)
 - `--port PORT`: Port to bind to (default: `11435`)
+- `--device DEVICE`: Backend device for HTTP-served models (`auto`, `cuda`, `cpu`, `mps`); default `auto` preserves each model's recommendation
 - `--reload`: Enable auto-reload for development
 
 **Example:**

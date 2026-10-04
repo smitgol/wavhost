@@ -9,10 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `wavhost pull --yes` for explicit noninteractive license/dependency acceptance
+- Configurable warm backend LRU via `WAVHOST_BACKEND_CACHE_SIZE` (default: 1)
+- Capability-aware Qwen precision selection with `WAVHOST_QWEN_DTYPE` override
+- Server-wide backend device override via `WAVHOST_DEVICE` / `wavhost serve --device`, including GPU Kokoro serving
 - Kokoro-82M backend (`kokoro`) with 54 named voices, default `af_heart`
 - `wavhost show <model>` to print model details and named voices
 - Website catalog and docs for Kokoro and `wavhost show`
 - README and PyPI project URLs now point at the website and docs
+
+### Fixed
+
+- Server logging now configures the `wavhost` package logger so backend model-load messages are visible without duplicate per-module handlers
 
 ## [0.2.1] - 2026-09-16
 

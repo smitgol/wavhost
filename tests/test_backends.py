@@ -12,6 +12,7 @@ from wavhost.backends import (
     ChatterboxBackend,
     KokoroBackend,
     QwenBackend,
+    _qwen_dtype_for_device,
     _load_chatterbox_turbo,
     create_backend,
 )
@@ -431,6 +432,56 @@ def test_qwen_backend_creation(checkpoint):
         model_info, device=CPU_DEVICE, checkpoint_path=checkpoint
     )
     assert isinstance(backend, QwenBackend)
+
+
+def test_qwen_dtype_auto_uses_float32_on_pascal(monkeypatch):
+    """Pascal lacks native BF16 and consumer FP16 throughput is poor."""
+    monkeypatch.delenv("WAVHOST_QWEN_DTYPE", raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (6, 1))
+
+    assert _qwen_dtype_for_device("cuda:0") is torch.float32
+
+
+def test_qwen_dtype_auto_uses_float16_on_turing(monkeypatch):
+    monkeypatch.delenv("WAVHOST_QWEN_DTYPE", raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (7, 5))
+
+    assert _qwen_dtype_for_device("cuda:0") is torch.float16
+
+
+def test_qwen_dtype_auto_uses_bfloat16_on_ampere(monkeypatch):
+    monkeypatch.delenv("WAVHOST_QWEN_DTYPE", raising=False)
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (8, 6))
+
+    assert _qwen_dtype_for_device("cuda:0") is torch.bfloat16
+
+
+def test_qwen_dtype_auto_preserves_mps_bfloat16(monkeypatch):
+    monkeypatch.delenv("WAVHOST_QWEN_DTYPE", raising=False)
+
+    assert _qwen_dtype_for_device("mps") is torch.bfloat16
+
+
+def test_qwen_dtype_override_allows_pascal_fp16_experiment(monkeypatch):
+    monkeypatch.setenv("WAVHOST_QWEN_DTYPE", "fp16")
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (6, 1))
+
+    assert _qwen_dtype_for_device("cuda:0") is torch.float16
+
+
+def test_qwen_dtype_rejects_pascal_bfloat16(monkeypatch):
+    monkeypatch.setenv("WAVHOST_QWEN_DTYPE", "bf16")
+    monkeypatch.setattr(torch.cuda, "get_device_capability", lambda device: (6, 1))
+
+    with pytest.raises(BackendError, match="compute capability 6.1"):
+        _qwen_dtype_for_device("cuda:0")
+
+
+def test_qwen_dtype_rejects_unknown_override(monkeypatch):
+    monkeypatch.setenv("WAVHOST_QWEN_DTYPE", "banana")
+
+    with pytest.raises(BackendError, match="WAVHOST_QWEN_DTYPE"):
+        _qwen_dtype_for_device("cpu")
 
 
 def test_multilingual_passes_language_id(checkpoint):

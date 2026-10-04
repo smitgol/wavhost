@@ -136,6 +136,21 @@ def test_pull_stays_quiet_when_gpu_build_is_fine(storage, engine, fake_pull):
     assert "Warning:" not in result.output
 
 
+def test_pull_yes_accepts_prompts_noninteractively(storage, engine, fake_pull):
+    """--yes makes pull suitable for explicit noninteractive provisioning."""
+    engine["installed"] = False
+
+    result = CliRunner().invoke(main, ["pull", "chatterbox-turbo", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    # --yes is explicit acceptance, not a way to hide what is being accepted.
+    assert "LICENSE:" in result.output
+    assert "Do you accept the license terms?" not in result.output
+    assert "Install the chatterbox engine now?" not in result.output
+    assert engine["installs"] == ["chatterbox"]
+    assert storage.manifest_exists("resemble", "chatterbox-turbo", "latest")
+
+
 def test_pull_skip_deps_never_installs(storage, engine, fake_pull):
     """--skip-deps leaves environment management to the user."""
     engine["installed"] = False
@@ -178,6 +193,34 @@ def test_pull_unknown_model_lists_alternatives(storage, engine, fake_pull):
 
     assert result.exit_code == 1
     assert "chatterbox-turbo" in result.output
+
+
+def test_serve_device_sets_server_policy(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr("wavhost.cli.torch.cuda.is_available", lambda: True)
+    # Track the variable through monkeypatch so serve()'s process-local update
+    # cannot leak into later tests in this pytest process.
+    monkeypatch.setenv("WAVHOST_DEVICE", "auto")
+
+    result = CliRunner().invoke(main, ["serve", "--device", "cuda", "--port", "12345"])
+
+    assert result.exit_code == 0, result.output
+    assert calls
+    assert calls[0][1]["port"] == 12345
+    assert "Backend device: cuda" in result.output
+
+
+def test_serve_explicit_cuda_fails_before_start(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr("wavhost.cli.torch.cuda.is_available", lambda: False)
+
+    result = CliRunner().invoke(main, ["serve", "--device", "cuda"])
+
+    assert result.exit_code == 1
+    assert "CUDA is not available" in result.output
+    assert calls == []
 
 
 def test_rm_removes_installed_model(storage, engine, fake_pull):

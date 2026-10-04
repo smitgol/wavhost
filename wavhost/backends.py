@@ -1,6 +1,7 @@
 """TTS backend protocol and implementations."""
 
 import inspect
+import os
 from pathlib import Path
 from typing import Any, Optional, Protocol, Union
 
@@ -198,6 +199,62 @@ def _detect_device() -> str:
     return CPU_DEVICE
 
 
+_QWEN_DTYPE_ENV = "WAVHOST_QWEN_DTYPE"
+_QWEN_DTYPE_ALIASES = {
+    "float32": torch.float32,
+    "fp32": torch.float32,
+    "float16": torch.float16,
+    "fp16": torch.float16,
+    "half": torch.float16,
+    "bfloat16": torch.bfloat16,
+    "bf16": torch.bfloat16,
+}
+
+
+def _qwen_dtype_for_device(
+    device: str, requested: Optional[str] = None
+) -> torch.dtype:
+    """Choose a Qwen dtype that matches the selected accelerator.
+
+    ``auto`` favors native accelerated formats while keeping older CUDA GPUs on
+    float32. Consumer Pascal GPUs such as GTX 10-series have weak FP16
+    throughput and no native BF16 support, so float32 is the conservative
+    default there. The environment override is useful for benchmarking a
+    different precision without changing a model registry entry.
+    """
+    value = (requested or os.environ.get(_QWEN_DTYPE_ENV, "auto")).strip().lower()
+    if value in {"", "auto"}:
+        torch_device = torch.device(device)
+        if torch_device.type == "cuda":
+            major, _minor = torch.cuda.get_device_capability(torch_device)
+            if major >= 8:
+                return torch.bfloat16
+            if major >= 7:
+                return torch.float16
+            return torch.float32
+        if torch_device.type == "mps":
+            # Preserve the existing Wavhost Qwen default on Apple Silicon.
+            return torch.bfloat16
+        return torch.float32
+
+    dtype = _QWEN_DTYPE_ALIASES.get(value)
+    if dtype is None:
+        allowed = "auto, float32/fp32, float16/fp16, bfloat16/bf16"
+        raise BackendError(
+            f"Invalid {_QWEN_DTYPE_ENV}={value!r}; expected one of: {allowed}"
+        )
+
+    torch_device = torch.device(device)
+    if dtype is torch.bfloat16 and torch_device.type == "cuda":
+        major, minor = torch.cuda.get_device_capability(torch_device)
+        if major < 8:
+            raise BackendError(
+                f"bfloat16 is not natively supported on CUDA compute capability "
+                f"{major}.{minor}; set {_QWEN_DTYPE_ENV}=auto or float32"
+            )
+    return dtype
+
+
 def _require_checkpoint(path: Path) -> Path:
     if not path.is_dir():
         raise BackendError(
@@ -390,8 +447,13 @@ class QwenBackend:
             from qwen_tts import Qwen3TTSModel
 
             device_map = "cuda:0" if self._device == "cuda" else self._device
-            dtype = (
-                torch.bfloat16 if self._device in ("cuda", "mps") else torch.float32
+            dtype = _qwen_dtype_for_device(
+                self._device, self._model_kwargs.get("dtype")
+            )
+            logger.info(
+                "Loading Qwen3-TTS with device=%s dtype=%s",
+                device_map,
+                str(dtype).removeprefix("torch."),
             )
             self._model = Qwen3TTSModel.from_pretrained(
                 str(self._checkpoint_path),

@@ -1,5 +1,6 @@
 """Command-line interface for Wavhost."""
 
+import os
 import sys
 from pathlib import Path
 from typing import NoReturn, Optional
@@ -77,7 +78,13 @@ def main():
     is_flag=True,
     help="Don't install the backend engine (assume it's already available)"
 )
-def pull(model_name: str, force: bool, skip_deps: bool) -> None:
+@click.option(
+    "-y",
+    "--yes",
+    is_flag=True,
+    help="Accept license and dependency-install prompts noninteractively",
+)
+def pull(model_name: str, force: bool, skip_deps: bool, yes: bool) -> None:
     """Pull a model from the registry.
     
     Displays license terms, installs the backend engine if needed, and
@@ -100,7 +107,7 @@ def pull(model_name: str, force: bool, skip_deps: bool) -> None:
             click.echo(registry.format_license_display(model_name))
             click.echo()
             
-            if not click.confirm("Do you accept the license terms?", default=True):
+            if not yes and not click.confirm("Do you accept the license terms?", default=True):
                 click.echo("License not accepted. Aborting.")
                 sys.exit(0)
         
@@ -108,7 +115,7 @@ def pull(model_name: str, force: bool, skip_deps: bool) -> None:
         # interpreter, so an existing manifest says nothing about whether this
         # Python can actually run the model.
         if not skip_deps:
-            _ensure_backend_installed(model_info.backend)
+            _ensure_backend_installed(model_info.backend, assume_yes=yes)
         
         # Installing the engine may have swapped a CUDA torch for the CPU
         # wheel PyPI serves for its exact pin. Say so now, with the fix, rather
@@ -133,7 +140,7 @@ def pull(model_name: str, force: bool, skip_deps: bool) -> None:
         handle_error(e)
 
 
-def _ensure_backend_installed(backend: str) -> None:
+def _ensure_backend_installed(backend: str, *, assume_yes: bool = False) -> None:
     """Install the engine a backend needs, prompting before doing so.
     
     Args:
@@ -153,7 +160,7 @@ def _ensure_backend_installed(backend: str) -> None:
     click.echo("This may download several hundred MB and take a few minutes.")
     click.echo()
     
-    if not click.confirm(f"Install the {backend} engine now?", default=True):
+    if not assume_yes and not click.confirm(f"Install the {backend} engine now?", default=True):
         click.echo("Aborting. Install it yourself with:")
         click.echo(f"  {dependencies.install_hint(backend)}")
         click.echo("Then re-run with --skip-deps.")
@@ -295,8 +302,15 @@ def _generate_speech(
 @main.command()
 @click.option("--host", default=DEFAULT_HOST, help="Host to bind to")
 @click.option("--port", default=DEFAULT_PORT, type=int, help="Port to bind to")
+@click.option(
+    "--device",
+    type=click.Choice(["auto", "cuda", "cpu", "mps"], case_sensitive=False),
+    default=lambda: os.environ.get("WAVHOST_DEVICE", "auto"),
+    show_default="auto",
+    help="Backend device for HTTP-served models; auto uses each model's recommendation",
+)
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
-def serve(host: str, port: int, reload: bool) -> None:
+def serve(host: str, port: int, device: str, reload: bool) -> None:
     """Start the OpenAI-compatible TTS server.
     
     Serves an OpenAI-compatible /v1/audio/speech endpoint.
@@ -305,9 +319,17 @@ def serve(host: str, port: int, reload: bool) -> None:
     """
     try:
         import uvicorn
-        
-        _display_server_info(host, port)
-        
+
+        device = device.lower()
+        if device == "cuda" and not torch.cuda.is_available():
+            raise BackendError("--device cuda was requested, but CUDA is not available")
+        if device == "mps" and not (
+            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        ):
+            raise BackendError("--device mps was requested, but MPS is not available")
+        os.environ["WAVHOST_DEVICE"] = device
+        _display_server_info(host, port, device)
+
         uvicorn.run(
             "wavhost.server:app",
             host=host,
@@ -322,14 +344,16 @@ def serve(host: str, port: int, reload: bool) -> None:
         handle_error(e)
 
 
-def _display_server_info(host: str, port: int) -> None:
+def _display_server_info(host: str, port: int, device: str = "auto") -> None:
     """Display server startup information.
     
     Args:
         host: Server host
         port: Server port
+        device: Server-wide backend device policy
     """
     click.echo("Starting Wavhost server...")
+    click.echo(f"Backend device: {device}")
     click.echo(f"OpenAI-compatible endpoint: http://{host}:{port}/v1/audio/speech")
     click.echo(f"\nExample curl command:")
     click.echo(f'curl http://{host}:{port}/v1/audio/speech \\')
